@@ -662,7 +662,11 @@
       if (!res.ok) throw new Error('HTTP ' + res.status);
       return res.json();
     }).then(function (d) {
-      if (!d || d.ok !== true) throw new Error((d && d.error) || 'ปลายทางตอบกลับผิดพลาด');
+      if (!d || d.ok !== true) {
+        var e = new Error((d && d.error) || 'ปลายทางตอบกลับผิดพลาด');
+        if (d && d.authError) e.auth = true;      // ปัญหาเรื่องรหัส ไม่ใช่เน็ตล่ม
+        throw e;
+      }
       return d;
     });
   }
@@ -681,17 +685,22 @@
   function flushQueue(silent) {
     var url = apiUrl(), q = getQueue();
     if (!url || !q.length) { renderBanners(); return Promise.resolve(0); }
-    var sent = 0;
+    var sent = 0, authBlocked = false;
     return q.reduce(function (chain, p) {
       return chain.then(function () {
         return postJson(url, p).then(function () {
           sent++;
           setQueue(getQueue().filter(function (x) { return x.inspectionId !== p.inspectionId; }));
-        }).catch(function () { /* ยังส่งไม่ได้ */ });
+        }).catch(function (err) {
+          if (err.auth) authBlocked = true;      // ค้างเพราะรหัส ไม่ใช่เน็ต
+        });
       });
     }, Promise.resolve()).then(function () {
       renderBanners();
       if (sent && !silent) toast('ส่งข้อมูลที่ค้างอยู่ ' + sent + ' ชุดสำเร็จ', 'ok');
+      if (authBlocked && !silent && window.DCAuth) {
+        DCAuth.challenge('ต้องใส่รหัสก่อน จึงจะส่งข้อมูลที่ค้างอยู่ได้');
+      }
       return sent;
     });
   }
@@ -797,6 +806,13 @@
       toast('บันทึกลง Google Sheet แล้ว (' + (res.rowsWritten != null ? res.rowsWritten : payload.rows.length) + ' แถว)', 'ok', 4000);
       renderBanners();
     }).catch(function (err) {
+      // ถ้าเป็นเรื่องรหัส การเก็บเข้าคิวไม่ช่วยอะไร เพราะส่งอีกกี่ครั้งก็ไม่ผ่าน
+      // ต้องขอรหัสจากผู้ใช้เลย (ผลตรวจในเครื่องยังอยู่ครบ ไม่หาย)
+      if (err.auth && window.DCAuth) {
+        toast('ต้องใส่รหัสก่อนบันทึก', 'err', 4000);
+        DCAuth.challenge(err.message);
+        return;
+      }
       enqueue(buildPayload(false));
       toast('ส่งไม่สำเร็จ: ' + err.message + ' — เก็บไว้ส่งภายหลังแล้ว', 'err', 5500);
     }).then(function () {

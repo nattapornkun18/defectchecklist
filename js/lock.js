@@ -157,6 +157,21 @@
       return payload;
     },
 
+    /**
+     * เด้งหน้าใส่รหัสทันที ใช้ตอนเซิร์ฟเวอร์บอกว่ารหัสไม่ผ่าน
+     * เช่นเครื่องนี้ยังโหลดไฟล์เก่าที่ยังไม่รู้ว่าต้องใส่รหัส
+     */
+    challenge: function (reason) {
+      if (el) return;                     // เปิดค้างอยู่แล้ว
+      localStorage.removeItem(K_PIN);
+      localStorage.removeItem(K_ROLE);
+      unlocked = false;
+      document.body.classList.remove('role-admin', 'role-inspector');
+      document.body.classList.add('locked');
+      build();
+      if (reason) msg(reason, 'err');
+    },
+
     logout: function () {
       localStorage.removeItem(K_PIN);
       localStorage.removeItem(K_ROLE);

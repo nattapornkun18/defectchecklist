@@ -53,14 +53,16 @@ function doPost(e) {
       // หน้าเว็บเปิดใช้รหัสแล้ว แต่ในชีทยังไม่ได้ตั้ง = ตั้งค่าไม่ครบ ต้องบอกให้รู้
       // ไม่งั้นจะกลายเป็นใส่รหัสอะไรก็ผ่าน โดยไม่มีอะไรเตือน
       if (body.expectPin && !pinsConfigured()) {
-        return json({ ok: false, error: 'ยังไม่ได้ตั้งรหัสในชีท — ' +
+        return json({ ok: false, authError: true,
+          error: 'ยังไม่ได้ตั้งรหัสในชีท — ' +
           'เปิดชีทแล้วไปที่เมนู Defect Checklist → 🔑 ตั้งรหัสเข้าใช้งาน ก่อน' });
       }
       return json(who
         ? { ok: true, role: who }
-        : { ok: false, error: 'รหัสไม่ถูกต้อง' });
+        : { ok: false, authError: true, error: 'รหัสไม่ถูกต้อง' });
     }
-    if (!who) return json({ ok: false, error: 'รหัสไม่ถูกต้องหรือยังไม่ได้ใส่รหัส' });
+    if (!who) return json({ ok: false, authError: true,
+      error: 'รหัสไม่ถูกต้องหรือยังไม่ได้ใส่รหัส' });
 
     if (action === 'submit') return json(handleSubmit(body));
 
@@ -70,7 +72,8 @@ function doPost(e) {
 
     // สามอย่างนี้เป็นการ "อ่านข้อมูลออกไป" จึงให้เฉพาะผู้ดูแล
     if (who !== 'admin') {
-      return json({ ok: false, error: 'ต้องใช้รหัสผู้ดูแล (admin) สำหรับคำสั่งนี้' });
+      return json({ ok: false, authError: true,
+        error: 'ต้องใช้รหัสผู้ดูแล (admin) สำหรับคำสั่งนี้' });
     }
     if (action === 'load') return json(handleLoad(body));
     if (action === 'summary') return json(handleSummary(body));

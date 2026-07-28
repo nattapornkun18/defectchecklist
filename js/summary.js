@@ -21,7 +21,11 @@
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     }).then(function (d) {
-      if (!d || d.ok !== true) throw new Error((d && d.error) || 'ปลายทางตอบกลับผิดพลาด');
+      if (!d || d.ok !== true) {
+        var e = new Error((d && d.error) || 'ปลายทางตอบกลับผิดพลาด');
+        if (d && d.authError) e.auth = true;
+        throw e;
+      }
       return d;
     });
   }
@@ -47,6 +51,11 @@
       initFilters();
       render();
     }).catch(function (err) {
+      if (err.auth && window.DCAuth) {
+        $('sub').textContent = 'ต้องใส่รหัส';
+        DCAuth.challenge(err.message);
+        return;
+      }
       $('sub').textContent = 'โหลดไม่สำเร็จ';
       banner('warn', 'ดึงข้อมูลไม่สำเร็จ: ' + err.message +
         ' — ถ้าเพิ่งแก้ Code.gs ต้อง Deploy → Manage deployments → New version ก่อน');
