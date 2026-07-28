@@ -19,3 +19,14 @@ const API_URL = 'https://script.google.com/macros/s/AKfycbwetfvrw9drmuokkQvz5DQI
 
 /** ส่งรูปถ่ายขึ้น Google Drive ด้วยหรือไม่ (ผู้ใช้เปลี่ยนเองรายเครื่องได้ในเมนู ⚙) */
 const UPLOAD_PHOTOS_DEFAULT = true;
+
+/**
+ * เลขเวอร์ชันของไฟล์ static (รูป / css / js)
+ *
+ * ⚠️ ทุกครั้งที่เปลี่ยนรูปใน img/ หรือแก้ checklist.js ให้ +1 ที่นี่
+ *    แล้วแก้เลข ?v= ใน index.html กับ tag.html ให้ตรงกันด้วย
+ *
+ * ถ้าไม่บวก เบราว์เซอร์ของผู้ตรวจจะยังใช้รูปเก่าที่ cache ไว้ มองไม่เห็นของใหม่
+ * เลขนี้แสดงในเมนู ⚙ ด้วย จะได้เช็คได้ว่าเครื่องนั้นอัปเดตแล้วหรือยัง
+ */
+const ASSET_VERSION = '3';

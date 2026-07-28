@@ -19,6 +19,12 @@
 
   var $ = function (id) { return document.getElementById(id); };
 
+  /** ต่อเลขเวอร์ชันท้าย URL รูป กันเบราว์เซอร์ใช้รูปเก่าที่ cache ไว้ */
+  function imgUrl(cat) {
+    var v = typeof ASSET_VERSION === 'string' ? ASSET_VERSION : '';
+    return v ? cat.img + '?v=' + v : cat.img;
+  }
+
   function todayISO() {
     var d = new Date();
     return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -117,7 +123,7 @@
           '<div class="cat-bar"><span class="p-pass"></span><span class="p-return"></span><span class="p-fix"></span></div>' +
           '<div class="cat-stat"></div>' +
         '</div>';
-      b.querySelector('.cat-thumb').src = cat.img;
+      b.querySelector('.cat-thumb').src = imgUrl(cat);
       b.querySelector('.cat-no').textContent = cat.no;
       b.querySelector('.cat-name').textContent = cat.th;
       b.querySelector('.cat-en').textContent = cat.name + ' · ' + cat.items.length + ' จุด';
@@ -173,7 +179,7 @@
     filter = 'all';
     $('catTitle').textContent = cat.no + '. ' + cat.th;
     $('catSub').textContent = cat.name + ' · ห้อง ' + state.room + ' · ' + cat.items.length + ' จุดตรวจ';
-    $('catImg').src = cat.img;
+    $('catImg').src = imgUrl(cat);
     $('catImg').alt = 'รูปอ้างอิงจุดตรวจ ' + cat.th;
     $('photoHintText').textContent = cat.hasPins
       ? 'แตะหมุดบนรูปเพื่อไปยังจุดนั้น'
@@ -460,7 +466,7 @@
     if (!openCat) return;
     $('viewerTitle').textContent = openCat.no + '. ' + openCat.th + ' (' + openCat.name + ')';
     var img = $('viewerImg');
-    img.src = openCat.img;
+    img.src = imgUrl(openCat);
     $('viewer').classList.add('open');
     document.body.style.overflow = 'hidden';
     img.onload = fitViewer;
@@ -724,7 +730,8 @@
 
   /** บอกว่า URL ที่ใช้อยู่มาจากไหน — ค่าเริ่มต้นของระบบ หรือที่ตั้งทับไว้เครื่องนี้ */
   function paintApiSource() {
-    var note = $('apiSrcNote'), reset = $('btnResetConn');
+    var note = $('apiSrcNote'), reset = $('btnResetConn'), ver = $('verText');
+    if (ver) ver.textContent = 'v' + (typeof ASSET_VERSION === 'string' ? ASSET_VERSION : '?');
     if (!note) return;
     if (overrideApiUrl()) {
       note.innerHTML = '⚠️ เครื่องนี้ตั้ง URL ทับค่าเริ่มต้นไว้ ' +

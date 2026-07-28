@@ -46,7 +46,7 @@
   }
 
   function selectCat() {
-    $('img').src = cat.img;
+    $('img').src = (typeof ASSET_VERSION === 'string' ? cat.img + '?v=' + ASSET_VERSION : cat.img);
     $('sub').textContent = cat.no + '. ' + cat.th + ' · ' + cat.name;
     render();
   }
