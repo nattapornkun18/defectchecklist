@@ -149,9 +149,13 @@
       card.querySelector('.cat-stat').innerHTML = bits.join('');
     });
 
+    var blanks = t.total - t.done;
+    var tail = blanks
+      ? ' · <span style="color:var(--muted)">อีก ' + blanks + ' จุดที่ไม่กรอก = ผ่าน</span>'
+      : ' · ตรวจครบทุกจุด';
     $('bottomSum').innerHTML = (t.ret || t.fix)
-      ? 'ส่งคืน <b class="bad">' + t.ret + '</b> · แก้เอง <b class="amb">' + t.fix + '</b> · เหลือ ' + (t.total - t.done) + ' จุด'
-      : 'ยังไม่พบ defect · เหลืออีก ' + (t.total - t.done) + ' จุด';
+      ? 'ส่งคืน <b class="bad">' + t.ret + '</b> · แก้เอง <b class="amb">' + t.fix + '</b>' + tail
+      : 'ยังไม่พบ defect' + tail;
 
     renderPrintArea();
   }
@@ -465,7 +469,11 @@
 
   function fitViewer() {
     var stage = $('viewerStage');
-    var iw = openCat.imgW, ih = openCat.imgH;
+    var img = $('viewerImg');
+    // อ่านขนาดจริงจากไฟล์รูป จะเปลี่ยนรูปใหม่โดยไม่ต้องแก้โค้ดก็ได้
+    var iw = img.naturalWidth || openCat.imgW;
+    var ih = img.naturalHeight || openCat.imgH;
+    if (!iw || !ih) return;
     vz.base = Math.min(stage.clientWidth / iw, stage.clientHeight / ih);
     vz.scale = vz.base;
     vz.x = (stage.clientWidth - iw * vz.scale) / 2;
@@ -609,6 +617,23 @@
 
   function apiUrl() { return overrideApiUrl() || defaultApiUrl(); }
 
+  /**
+   * ตั้งจุดที่ยังไม่ได้กรอกผลให้เป็น "ผ่าน" ทั้งหมด
+   * ผู้ตรวจจึงกรอกเฉพาะจุดที่เป็น ส่งคืน / แก้เอง เท่านั้น
+   */
+  function autoPassBlanks() {
+    var n = 0;
+    allItems().forEach(function (it) {
+      var v = itemState(it.key);
+      if (!v || !v.r) { setItem(it.key, { r: 'pass' }); n++; }
+    });
+    if (n) {
+      refreshHome();
+      if (openCat) { renderItems(); renderPins(); refreshCat(); }
+    }
+    return n;
+  }
+
   function uploadPhotos() {
     var v = localStorage.getItem(LS.photos);
     if (v === null) return typeof UPLOAD_PHOTOS_DEFAULT === 'boolean' ? UPLOAD_PHOTOS_DEFAULT : true;
@@ -669,10 +694,16 @@
       $('fInspector').focus();
       return;
     }
-    var t = statsOf(allItems());
-    if (!t.done) { toast('ยังไม่ได้ตรวจจุดใดเลย', 'err'); return; }
-    if (t.done < t.total &&
-        !confirm('ยังตรวจไม่ครบอีก ' + (t.total - t.done) + ' จุด\nต้องการบันทึกเลยหรือไม่?')) return;
+    var before = statsOf(allItems());
+    if (!before.done) { toast('ยังไม่ได้กรอกจุดใดเลย', 'err'); return; }
+
+    // จุดที่ไม่ได้กรอก ส่งคืน/แก้เอง = ผ่าน อัตโนมัติ
+    var blanks = before.total - before.done;
+    if (blanks) {
+      if (!confirm('ยังไม่ได้กรอก ' + blanks + ' จุด\n\n' +
+                   'ระบบจะบันทึกจุดเหล่านี้เป็น "ผ่าน" ทั้งหมด\nยืนยันบันทึกหรือไม่?')) return;
+      autoPassBlanks();
+    }
 
     var payload = buildPayload(uploadPhotos());
     var btn = $('btnSave');
