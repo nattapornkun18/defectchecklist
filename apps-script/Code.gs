@@ -398,12 +398,29 @@ function buildSummarySheet() {
   sh.getRange(1, 1, grid.length, width).setValues(grid);
   Logger.log('เขียนข้อมูลลงแท็บแล้ว ' + grid.length + ' แถว × ' + width + ' คอลัมน์');
 
-  // ── จัดรูปแบบ ── (ห่อไว้ เพราะถึงตกแต่งพัง ตัวเลขก็ต้องอยู่ในชีทแล้ว)
+  // ── รูปแบบตัวเลข ──
+  // ต้องทำก่อนและแยกจากการตกแต่ง เพราะถ้าไปอยู่รวมกัน แล้วการตกแต่ง
+  // (เช่น merge) พังก่อน จะข้ามส่วนนี้ไปทั้งหมด ทำให้ตัวเลขแสดงผิด
+  // เช่นเลข 28 โผล่มาเป็นวันที่ 1900-01-27 เพราะรูปแบบเก่าค้างอยู่
+  var fmtOk = 0;
+  fmt.forEach(function (f) {
+    if (f.type !== 'data' && f.type !== 'total') return;
+    try {
+      sh.getRange(f.row, 1, 1, f.cols)
+        .setNumberFormats([numberFormatRow(f.cols, f.nCats)]);
+      fmtOk++;
+    } catch (e) { /* แถวเดียวพัง ไม่ควรลามแถวอื่น */ }
+  });
+  Logger.log('ตั้งรูปแบบตัวเลขแล้ว ' + fmtOk + ' แถว');
+
+  // ── ตกแต่ง ── (ห่อไว้ เพราะถึงตกแต่งพัง ตัวเลขก็ต้องถูกต้องแล้ว)
   try {
   sh.getRange(1, 1).setFontSize(13).setFontWeight('bold');
   sh.getRange(2, 1).setFontSize(9).setFontColor('#5e6a7e');
 
+  var decorFails = 0, firstDecorErr = '';
   fmt.forEach(function (f) {
+    try {
     var r = sh.getRange(f.row, 1, 1, f.cols);
     if (f.type === 'group') {
       r.merge().setBackground('#14607a').setFontColor('#ffffff').setFontWeight('bold');
@@ -413,19 +430,29 @@ function buildSummarySheet() {
       sh.getRange(f.row, 1, 1, 2).setHorizontalAlignment('left');
     } else if (f.type === 'total') {
       r.setBackground('#dfe7ee').setFontWeight('bold');
-      r.setNumberFormats([numberFormatRow(f.cols, f.nCats)]);
     } else if (f.type === 'data') {
-      // ตั้งรูปแบบเองทุกช่อง ไม่งั้นรูปแบบเก่าจะค้าง เช่นตอนที่คอลัมน์วันที่
-      // เคยอยู่ตรงตำแหน่งนี้ ทำให้เลข 28 กลายเป็นวันที่ 1900-01-27
-      r.setNumberFormats([numberFormatRow(f.cols, f.nCats)]);
-
       // ระบายสีตามจำนวนที่พบ เข้ม = เยอะ
       var colors = f.vals.map(function (v) { return heatColor(v, maxVal); });
       if (colors.length) {
         sh.getRange(f.row, f.first, 1, colors.length).setBackgrounds([colors]);
       }
     }
+    } catch (e) {
+      // แถวเดียวตกแต่งไม่ได้ ไม่ควรลามแถวอื่น แต่ต้องนับไว้ให้รู้
+      decorFails++;
+      if (!firstDecorErr) firstDecorErr = 'แถว ' + f.row + ' (' + f.type + '): ' +
+        String((e && e.message) || e);
+    }
   });
+
+  if (decorFails) {
+    Logger.log('⚠️ ตกแต่งไม่สำเร็จ ' + decorFails + ' แถว — ' + firstDecorErr);
+    try {
+      PropertiesService.getScriptProperties().setProperty('lastSummaryError',
+        new Date().toISOString() + ' — ตกแต่งไม่สำเร็จ ' + decorFails +
+        ' แถว (ตัวเลขยังถูกต้อง): ' + firstDecorErr);
+    } catch (e) { /* ไม่เป็นไร */ }
+  }
 
   sh.setFrozenColumns(1);
   sh.autoResizeColumns(1, Math.min(width, 20));
