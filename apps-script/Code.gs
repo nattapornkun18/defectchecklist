@@ -132,9 +132,22 @@ function handleSubmit(p) {
       } catch (e) { /* ไม่ใช่เรื่องคอขาดบาดตาย */ }
     }
 
-    try { buildSummarySheet(); } catch (e) { /* สรุปพังไม่ควรทำให้บันทึกล้มเหลว */ }
+    // สร้างชีทสรุปไม่สำเร็จไม่ควรทำให้บันทึกล้มเหลว แต่ต้องรู้ว่าพังเพราะอะไร
+    var summaryError = '';
+    try {
+      buildSummarySheet();
+    } catch (e) {
+      summaryError = String((e && e.message) || e);
+      try {
+        PropertiesService.getScriptProperties()
+          .setProperty('lastSummaryError', new Date().toISOString() + ' — ' + summaryError);
+      } catch (e2) { /* ไม่เป็นไร */ }
+    }
 
-    return { ok: true, rowsWritten: out.length, inspectionId: p.inspectionId };
+    return {
+      ok: true, rowsWritten: out.length, inspectionId: p.inspectionId,
+      summaryError: summaryError
+    };
   } finally {
     lock.releaseLock();
   }
@@ -252,6 +265,11 @@ function buildSummarySheet() {
   var sh = ss.getSheetByName(SHEET_PIVOT) || ss.insertSheet(SHEET_PIVOT);
   sh.clear();
   sh.clearConditionalFormatRules();
+  // clear() ไม่ได้ยกเลิก merge ที่ทำไว้รอบก่อน ถ้าไม่ยกเลิกก่อน
+  // รอบถัดไปจะ merge ทับช่วงเดิมแบบไม่พอดีแล้ว throw
+  if (sh.getMaxRows() > 0 && sh.getMaxColumns() > 0) {
+    sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns()).breakApart();
+  }
 
   if (!list.length) {
     sh.getRange(1, 1).setValue('ยังไม่มีผลตรวจ').setFontWeight('bold');
@@ -323,7 +341,8 @@ function buildSummarySheet() {
   });
   sh.getRange(1, 1, grid.length, width).setValues(grid);
 
-  // ── จัดรูปแบบ ──
+  // ── จัดรูปแบบ ── (ห่อไว้ เพราะถึงตกแต่งพัง ตัวเลขก็ต้องอยู่ในชีทแล้ว)
+  try {
   sh.getRange(1, 1).setFontSize(13).setFontWeight('bold');
   sh.getRange(2, 1).setFontSize(9).setFontColor('#5e6a7e');
 
@@ -341,17 +360,28 @@ function buildSummarySheet() {
       sh.getRange(f.row, 3).setNumberFormat('0.00%');
       // ระบายสีตามจำนวนที่พบ เข้ม = เยอะ
       var colors = f.vals.map(function (v) { return heatColor(v, maxVal); });
-      sh.getRange(f.row, f.first, 1, colors.length).setBackgrounds([colors]);
+      if (colors.length) {
+        sh.getRange(f.row, f.first, 1, colors.length).setBackgrounds([colors]);
+      }
     }
   });
 
   sh.setFrozenColumns(1);
   sh.autoResizeColumns(1, Math.min(width, 20));
   sh.getRange(1, 1, grid.length, width).setVerticalAlignment('middle');
+  } catch (fmtErr) {
+    try {
+      PropertiesService.getScriptProperties().setProperty('lastSummaryError',
+        new Date().toISOString() + ' — จัดรูปแบบไม่สำเร็จ (ตัวเลขยังถูกต้อง): ' +
+        String((fmtErr && fmtErr.message) || fmtErr));
+    } catch (e) { /* ไม่เป็นไร */ }
+  }
 
-  // ย้ายไปเป็นแท็บแรก จะได้เห็นก่อนเพื่อน
-  ss.setActiveSheet(sh);
-  ss.moveActiveSheet(1);
+  // ย้ายไปเป็นแท็บแรก จะได้เห็นก่อนเพื่อน — ล้มเหลวได้ ไม่ใช่เรื่องสำคัญ
+  try {
+    ss.setActiveSheet(sh);
+    ss.moveActiveSheet(1);
+  } catch (e) { /* ไม่เป็นไร */ }
 }
 
 /** ไล่เฉดสีเดียว อ่อน → เข้ม (ตัวเลขยังอยู่ในช่อง สีเป็นแค่ตัวช่วยอ่าน) */
@@ -406,13 +436,68 @@ function catQty(insp, catName) {
   return c ? (c.qty || 0) : 0;
 }
 
-/** เมนูในชีท เผื่ออยากสั่งอัปเดตเอง */
+/** เมนูในชีท */
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Defect Checklist')
     .addItem('อัปเดตชีทสรุปรวม', 'buildSummarySheet')
+    .addItem('ลบผลตรวจ 1 ครั้ง (ตาม InspectionID)', 'deleteInspectionByPrompt')
+    .addItem('ดูข้อผิดพลาดล่าสุดของชีทสรุป', 'showLastSummaryError')
     .addItem('สร้างชีทที่จำเป็น', 'setupSheets')
     .addToUi();
+}
+
+/**
+ * ลบผลตรวจของการตรวจ 1 ครั้งออกจากชีท (ทั้ง Inspections และ DefectLog)
+ * ใช้ตอนกดบันทึกผิดห้อง หรืออยากเคลียร์ข้อมูลทดลองทิ้ง
+ */
+function deleteInspectionByPrompt() {
+  var ui = SpreadsheetApp.getUi();
+  var res = ui.prompt('ลบผลตรวจ 1 ครั้ง',
+    'ใส่ InspectionID ที่จะลบ (ก๊อปจากคอลัมน์ B ของชีท Inspections)\n' +
+    'รูปแบบ: ห้อง-วันที่-เลขรอบ  เช่น  310-2026-07-28-1',
+    ui.ButtonSet.OK_CANCEL);
+  if (res.getSelectedButton() !== ui.Button.OK) return;
+
+  var id = res.getResponseText().trim();
+  if (!id) { ui.alert('ไม่ได้ใส่ InspectionID'); return; }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sumSheet = ss.getSheetByName(SHEET_SUMMARY);
+  var detSheet = ss.getSheetByName(SHEET_DETAIL);
+
+  var found = 0;
+  if (sumSheet && sumSheet.getLastRow() >= 2) {
+    sumSheet.getRange(2, 2, sumSheet.getLastRow() - 1, 1).getValues()
+      .forEach(function (r) { if (String(r[0]) === id) found++; });
+  }
+  if (!found) { ui.alert('ไม่พบ InspectionID นี้ในชีท Inspections'); return; }
+
+  if (ui.alert('ยืนยันการลบ',
+      'จะลบผลตรวจ "' + id + '" ออกจากทั้ง Inspections และ DefectLog\n' +
+      'ลบแล้วกู้คืนไม่ได้ ยืนยันหรือไม่?',
+      ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    if (sumSheet) deleteRowsById(sumSheet, 2, id);
+    if (detSheet) deleteRowsById(detSheet, 2, id);
+    buildSummarySheet();
+  } finally {
+    lock.releaseLock();
+  }
+  ui.alert('ลบเรียบร้อย และอัปเดตชีทสรุปรวมให้แล้ว');
+}
+
+/** ดูว่าชีทสรุปพังเพราะอะไรครั้งล่าสุด */
+function showLastSummaryError() {
+  var msg;
+  try {
+    msg = PropertiesService.getScriptProperties().getProperty('lastSummaryError');
+  } catch (e) { msg = null; }
+  SpreadsheetApp.getUi().alert('ข้อผิดพลาดล่าสุดของชีทสรุป',
+    msg || 'ไม่มีข้อผิดพลาดที่บันทึกไว้', SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 /* ───────────────────────── helpers ───────────────────────── */
