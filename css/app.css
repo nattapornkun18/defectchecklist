@@ -309,3 +309,18 @@ dialog::backdrop { background: rgba(16, 24, 38, .5); }
   #printArea .ch { font-weight: 700; background: #f2f2f2; }
   #printArea tr { break-inside: avoid; }
 }
+
+/* ══════════ แถบแจ้งเวอร์ชันใหม่ ══════════ */
+.update-bar {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(80px + var(--safe-b)); z-index: 95;
+  background: var(--brand); color: #fff; border-radius: 99px;
+  padding: 9px 9px 9px 16px; display: flex; align-items: center; gap: 10px;
+  font-size: .82rem; box-shadow: 0 6px 22px rgba(14, 70, 87, .4);
+  max-width: 94vw;
+}
+.update-bar button {
+  background: #fff; color: var(--brand); border-radius: 99px;
+  padding: 7px 14px; font-weight: 700; font-size: .82rem; white-space: nowrap;
+}
+@media print { .update-bar { display: none !important; } }

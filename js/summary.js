@@ -413,11 +413,42 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+
+  /* ═════════ ตรวจว่ามีเวอร์ชันใหม่หรือยัง ═════════ */
+  /* ?v= กันแคชได้แค่ css/js/รูป แต่ตัวไฟล์ HTML เองยังถูกแคชได้
+     จึงถาม version.json ตรง ๆ แบบไม่ผ่านแคช แล้วเทียบกับเวอร์ชันที่โหลดมาจริง */
+  function checkForUpdate() {
+    if (typeof ASSET_VERSION !== 'string') return;
+    fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || !d.version || String(d.version) === ASSET_VERSION) return;
+        showUpdateBar(String(d.version));
+      })
+      .catch(function () { /* ออฟไลน์อยู่ ไม่ต้องทำอะไร */ });
+  }
+
+  function showUpdateBar(newVer) {
+    if (document.getElementById('updBar')) return;
+    var bar = document.createElement('div');
+    bar.id = 'updBar';
+    bar.className = 'update-bar';
+    bar.innerHTML = '<span>มีเวอร์ชันใหม่ (v' + newVer + ') — ตอนนี้ใช้ v' +
+      ASSET_VERSION + ' อยู่</span><button type="button">อัปเดตเลย</button>';
+    bar.querySelector('button').addEventListener('click', function () {
+      // ใส่ query ใหม่ท้าย URL เพื่อบังคับให้โหลดไฟล์ HTML ใหม่จริง ๆ
+      var base = location.href.split('?')[0].split('#')[0];
+      location.replace(base + '?u=' + Date.now());
+    });
+    document.body.appendChild(bar);
+  }
+
   /* ═════════ init ═════════ */
   $('dClose').addEventListener('click', function () { $('dlgDetail').close(); });
   $('dOk').addEventListener('click', function () { $('dlgDetail').close(); });
   $('dPrint').addEventListener('click', function () { window.print(); });
   $('btnReload').addEventListener('click', load);
+  checkForUpdate();
   $('btnPrint').addEventListener('click', function () { window.print(); });
   load();
 })();
