@@ -232,15 +232,16 @@
     list.forEach(function (i, idx) {
       var tot = totals[idx];
       var pts = i.total || TOTAL_ITEMS;
-      h += '<tr><td class="room">' + esc(i.room) + '</td>' +
-        '<td class="num total">' + tot + '</td>' +
+      h += '<tr><td class="room' + (tot ? ' has' : '') + '" data-i="' + idx + '">' + esc(i.room) + '</td>' +
+        '<td class="num total' + (tot ? ' has' : '') + '" data-i="' + idx + '">' + tot + '</td>' +
         '<td class="num pct">' + (pts ? (tot / pts * 100).toFixed(2) : '0') + '%</td>' +
         cols.map(function (c) {
           var v = catValue(i, c.name);
           var lvl = level(v, max);
           var cc = i.cats && i.cats[c.name];
-          return '<td class="num cell' + (lvl >= 5 ? ' hot' : '') + (v ? '' : ' zero') + '"' +
+          return '<td class="num cell' + (lvl >= 5 ? ' hot' : '') + (v ? ' has' : ' zero') + '"' +
             ' style="background:var(--heat-' + lvl + ')"' +
+            ' data-i="' + idx + '" data-cn="' + esc(c.name) + '"' +
             ' data-room="' + esc(i.room) + '" data-cat="' + esc(c.th) + '"' +
             ' data-ret="' + ((cc && cc.ret) || 0) + '" data-fix="' + ((cc && cc.fix) || 0) + '"' +
             ' data-qty="' + ((cc && cc.qty) || 0) + '">' + (v || '–') + '</td>';
@@ -258,6 +259,7 @@
 
     card.innerHTML = h + '</tbody></table></div>';
     bindTips(card);
+    bindDrill(card, list);
     return card;
   }
 
@@ -267,6 +269,112 @@
     if (max <= 1) return 3;
     var f = v / max;
     return f <= 0.10 ? 1 : f <= 0.25 ? 2 : f <= 0.45 ? 3 : f <= 0.65 ? 4 : f <= 0.85 ? 5 : 6;
+  }
+
+  /* ═════════ กดดูรายจุดที่ต้องแก้ ═════════ */
+  var detailCache = {};      // inspectionId -> items[]
+
+  /** หาข้อความจุดตรวจจาก checklist.js ด้วยชื่อหมวด + เลขข้อ */
+  function itemText(catName, no) {
+    for (var i = 0; i < CATEGORIES.length; i++) {
+      if (CATEGORIES[i].name !== catName) continue;
+      var found = CATEGORIES[i].items.filter(function (x) { return x.no === Number(no); })[0];
+      return found ? found.th : '(ไม่มีข้อ ' + no + ' ในฟอร์มปัจจุบัน)';
+    }
+    return '(ไม่มีหมวด ' + catName + ' ในฟอร์มปัจจุบัน)';
+  }
+
+  function catThOf(catName) {
+    var c = CATEGORIES.filter(function (x) { return x.name === catName; })[0];
+    return c ? c.th : catName;
+  }
+
+  /** เปิดกล่องรายละเอียด — catName ว่าง = แสดงทุกหมวดของห้องนั้น */
+  function openDetail(insp, catName) {
+    $('dTitle').textContent = 'ห้อง ' + insp.room +
+      (catName ? ' · ' + catThOf(catName) : ' · ทุกหมวด');
+    $('dMeta').textContent = [insp.roomType, insp.round, insp.date,
+      insp.inspector ? 'ผู้ตรวจ ' + insp.inspector : ''].filter(Boolean).join(' · ');
+    $('dBody').innerHTML = '<div class="loading">กำลังโหลดรายละเอียด…</div>';
+    $('dSum').textContent = '';
+    $('dlgDetail').showModal();
+
+    var cached = detailCache[insp.inspectionId];
+    if (cached) { paintDetail(cached, catName); return; }
+
+    postJson(apiUrl(), { action: 'load', inspectionId: insp.inspectionId })
+      .then(function (res) {
+        var items = (res && res.items) || [];
+        detailCache[insp.inspectionId] = items;
+        paintDetail(items, catName);
+      })
+      .catch(function (err) {
+        $('dBody').innerHTML = '<div class="loading">โหลดรายละเอียดไม่สำเร็จ<br>' + esc(err.message) + '</div>';
+      });
+  }
+
+  function paintDetail(items, catName) {
+    var m = mode();
+    var list = items.filter(function (it) {
+      if (it.result !== 'return' && it.result !== 'fix') return false;
+      if (catName && it.cat !== catName) return false;
+      if (m === 'return' && it.result !== 'return') return false;
+      if (m === 'fix' && it.result !== 'fix') return false;
+      return true;
+    });
+
+    if (!list.length) {
+      $('dBody').innerHTML = '<div class="loading">ไม่มีจุดที่ต้องแก้ในส่วนนี้</div>';
+      $('dSum').textContent = '';
+      return;
+    }
+
+    // จัดกลุ่มตามหมวด เรียงตามลำดับหมวดในฟอร์ม แล้วเรียงตามเลขข้อ
+    var order = CATEGORIES.map(function (c) { return c.name; });
+    var groups = {};
+    list.forEach(function (it) { (groups[it.cat] || (groups[it.cat] = [])).push(it); });
+    var names = Object.keys(groups).sort(function (a, b) {
+      var ia = order.indexOf(a), ib = order.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+
+    var html = '', ret = 0, fix = 0, qty = 0;
+    names.forEach(function (n) {
+      var g = groups[n].sort(function (a, b) { return a.no - b.no; });
+      html += '<div class="d-group"><h4>' + esc(catThOf(n)) + ' · ' + g.length + ' จุด</h4>';
+      g.forEach(function (it) {
+        var q = Math.max(1, it.qty || 1);
+        if (it.result === 'return') { ret++; } else { fix++; }
+        qty += q;
+        html += '<div class="d-item r-' + it.result + '">' +
+          '<span class="no">' + it.no + '</span>' +
+          '<span class="body"><span class="txt">' + esc(itemText(n, it.no)) + '</span>' +
+          '<span class="sub"><span class="tag">' +
+            (it.result === 'return' ? '↩ ส่งคืน' : '🔧 แก้เอง') + '</span>' +
+            ' · จำนวน ' + q + ' จุด</span>' +
+          (it.note ? '<div class="note">' + esc(it.note) + '</div>' : '') +
+          (it.photos && it.photos.length
+            ? '<div class="pics">' + it.photos.map(function (u, i) {
+                return '<a href="' + esc(u) + '" target="_blank" rel="noopener">📷 รูป ' + (i + 1) + '</a>';
+              }).join('') + '</div>'
+            : '') +
+          '</span></div>';
+      });
+      html += '</div>';
+    });
+
+    $('dBody').innerHTML = html;
+    $('dSum').textContent = 'ส่งคืน ' + ret + ' · แก้เอง ' + fix + ' · รวม ' + qty + ' จุด';
+  }
+
+  function bindDrill(root, list) {
+    root.querySelectorAll('td.has').forEach(function (td) {
+      td.addEventListener('click', function () {
+        var insp = list[Number(td.dataset.i)];
+        if (!insp) return;
+        openDetail(insp, td.dataset.cn || '');
+      });
+    });
   }
 
   /* ═════════ tooltip ═════════ */
@@ -306,6 +414,9 @@
   }
 
   /* ═════════ init ═════════ */
+  $('dClose').addEventListener('click', function () { $('dlgDetail').close(); });
+  $('dOk').addEventListener('click', function () { $('dlgDetail').close(); });
+  $('dPrint').addEventListener('click', function () { window.print(); });
   $('btnReload').addEventListener('click', load);
   $('btnPrint').addEventListener('click', function () { window.print(); });
   load();
