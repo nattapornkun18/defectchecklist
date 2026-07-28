@@ -626,7 +626,21 @@ function diagnose() {
         catsOf(rt).map(function (c) { return c.th; }).join(', '));
     });
 
-    add('เวอร์ชันโค้ด', 'มี buildSummarySheet = ' + (typeof buildSummarySheet === 'function'));
+    add('เวอร์ชันโค้ด', 'มี buildSummarySheet = ' + (typeof buildSummarySheet === 'function') +
+      ' · มี roleOf = ' + (typeof roleOf === 'function') +
+      ' · มี pinsConfigured = ' + (typeof pinsConfigured === 'function'));
+
+    // สถานะระบบรหัส — จุดที่คนสับสนบ่อยว่า "ใส่รหัสในเว็บ" กับ "ตั้งรหัส" คนละเรื่อง
+    var pp = PropertiesService.getScriptProperties();
+    var pa = (pp.getProperty('PIN_ADMIN') || '').trim();
+    var pi = (pp.getProperty('PIN_INSPECTOR') || '').trim();
+    if (!pa && !pi) {
+      add('🔓 ระบบรหัส', 'ยังไม่ได้ตั้ง — ใครใส่รหัสอะไรก็เข้าได้หมด ' +
+        'ถ้าตั้งใจจะใช้รหัส ให้ไปที่เมนู Defect Checklist → 🔑 ตั้งรหัสเข้าใช้งาน');
+    } else {
+      add('🔒 ระบบรหัส', 'ตั้งแล้ว — ผู้ดูแล ' + (pa ? '✓ (' + pa.length + ' หลัก)' : '✗ ยังไม่ได้ตั้ง') +
+        ' · ผู้ตรวจ ' + (pi ? '✓ (' + pi.length + ' หลัก)' : '✗ ยังไม่ได้ตั้ง'));
+    }
 
     buildSummarySheet();
     var pv = ss.getSheetByName(SHEET_PIVOT);
