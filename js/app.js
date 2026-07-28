@@ -651,6 +651,7 @@
   }
 
   function postJson(url, payload) {
+    if (window.DCAuth) DCAuth.sign(payload);      // แนบรหัสไปด้วยทุกครั้ง
     // text/plain เพื่อเลี่ยง CORS preflight ที่ Apps Script ไม่รองรับ
     return fetch(url, {
       method: 'POST',
@@ -806,7 +807,13 @@
   /** บอกว่า URL ที่ใช้อยู่มาจากไหน — ค่าเริ่มต้นของระบบ หรือที่ตั้งทับไว้เครื่องนี้ */
   function paintApiSource() {
     var note = $('apiSrcNote'), reset = $('btnResetConn'), ver = $('verText');
-    if (ver) ver.textContent = 'v' + (typeof ASSET_VERSION === 'string' ? ASSET_VERSION : '?');
+    if (ver) {
+      var r = window.DCAuth ? DCAuth.role() : '';
+      ver.textContent = 'v' + (typeof ASSET_VERSION === 'string' ? ASSET_VERSION : '?') +
+        (r ? ' · เข้าใช้งานเป็น ' + (r === 'admin' ? 'ผู้ดูแล' : 'ผู้ตรวจ') : '');
+    }
+    var lo = $('btnLogout');
+    if (lo) lo.hidden = !(window.DCAuth && DCAuth.role());
     if (!note) return;
     if (overrideApiUrl()) {
       note.innerHTML = '⚠️ เครื่องนี้ตั้ง URL ทับค่าเริ่มต้นไว้ ' +
@@ -998,6 +1005,12 @@
       renderBanners();
       flushQueue(true);
       toast('บันทึกการตั้งค่าแล้ว', 'ok');
+    });
+
+    $('btnLogout').addEventListener('click', function () {
+      if (confirm('ออกจากระบบ? ครั้งหน้าต้องใส่รหัสใหม่\n(ผลตรวจที่ค้างอยู่ในเครื่องไม่หาย)')) {
+        DCAuth.logout();
+      }
     });
 
     $('btnResetConn').addEventListener('click', function () {

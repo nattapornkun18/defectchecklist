@@ -1,0 +1,52 @@
+/* lock.css — หน้าจอใส่รหัสก่อนเข้าใช้งาน */
+
+.lock {
+  position: fixed; inset: 0; z-index: 200;
+  background: #10141c; color: #e8ecf3;
+  display: grid; place-items: center;
+  padding: 24px 18px calc(24px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+}
+
+.lock-box { width: 100%; max-width: 300px; text-align: center; }
+.lock-box.shake { animation: lockshake .4s ease; }
+@keyframes lockshake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-9px); }
+  40% { transform: translateX(9px); }
+  60% { transform: translateX(-5px); }
+  80% { transform: translateX(5px); }
+}
+
+.lock-bar { width: 46px; height: 3px; border-radius: 99px; background: #d8a13c; margin: 0 auto 18px; }
+.lock-title { font-size: 1.02rem; font-weight: 700; }
+.lock-sub { font-size: .82rem; color: #93a0b4; margin-top: 3px; }
+
+.lock-dots { display: flex; gap: 13px; justify-content: center; margin: 26px 0 22px; }
+.lock-dots span {
+  width: 11px; height: 11px; border-radius: 50%;
+  border: 1.5px solid #5b6779; transition: all .15s;
+}
+.lock-dots span.on { background: #e8ecf3; border-color: #e8ecf3; transform: scale(1.1); }
+
+.lock-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; }
+.lock-key {
+  height: 58px; border-radius: 11px;
+  background: #1b212c; color: #e8ecf3;
+  font-size: 1.32rem; font-weight: 600;
+  transition: background .12s;
+}
+.lock-key:active { background: #2b3444; }
+.lock-key-alt { background: transparent; font-size: .92rem; font-weight: 500; color: #93a0b4; }
+.lock-key-alt:active { background: #1b212c; }
+
+.lock-msg { min-height: 20px; margin-top: 16px; font-size: .82rem; color: #93a0b4; }
+.lock-msg.err { color: #ff8f8f; }
+
+/* ยังไม่ปลดล็อก = ไม่ต้องแสดงเนื้อหาแอปเลย */
+body.locked .screen,
+body.locked .bottom-bar,
+body.locked .viewer { display: none !important; }
+
+/* ซ่อนของที่เฉพาะผู้ดูแลใช้ได้ เมื่อเข้ามาด้วยรหัสผู้ตรวจ */
+body.role-inspector .admin-only { display: none !important; }

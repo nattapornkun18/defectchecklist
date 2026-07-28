@@ -46,7 +46,22 @@ function doPost(e) {
         time: new Date().toISOString()
       });
     }
+    // ── ตรวจรหัสก่อน ──
+    var who = roleOf(body.pin);
+
+    if (action === 'auth') {
+      return json(who
+        ? { ok: true, role: who }
+        : { ok: false, error: 'รหัสไม่ถูกต้อง' });
+    }
+    if (!who) return json({ ok: false, error: 'รหัสไม่ถูกต้องหรือยังไม่ได้ใส่รหัส' });
+
     if (action === 'submit') return json(handleSubmit(body));
+
+    // สามอย่างนี้เป็นการ "อ่านข้อมูลออกไป" จึงให้เฉพาะผู้ดูแล
+    if (who !== 'admin') {
+      return json({ ok: false, error: 'ต้องใช้รหัสผู้ดูแล (admin) สำหรับคำสั่งนี้' });
+    }
     if (action === 'load') return json(handleLoad(body));
     if (action === 'summary') return json(handleSummary(body));
     if (action === 'rebuildSheet') { buildSummarySheet(); return json({ ok: true }); }
@@ -459,6 +474,9 @@ function onOpen() {
     .addItem('ลบผลตรวจ (พิมพ์ InspectionID เอง)', 'deleteInspectionByPrompt')
     .addItem('ดูข้อผิดพลาดล่าสุดของชีทสรุป', 'showLastSummaryError')
     .addItem('🔍 ตรวจสอบระบบ (diagnose)', 'diagnose')
+    .addSeparator()
+    .addItem('🔑 ตั้งรหัสเข้าใช้งาน', 'setupPins')
+    .addItem('ยกเลิกระบบรหัส', 'clearPins')
     .addItem('สร้างชีทที่จำเป็น', 'setupSheets')
     .addToUi();
 }
@@ -604,6 +622,75 @@ function showLastSummaryError() {
   } catch (e) { msg = null; }
   SpreadsheetApp.getUi().alert('ข้อผิดพลาดล่าสุดของชีทสรุป',
     msg || 'ไม่มีข้อผิดพลาดที่บันทึกไว้', SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+/* ═════════════════════ รหัสเข้าใช้งาน ═════════════════════ */
+
+/**
+ * คืนค่า 'admin' / 'inspector' ถ้ารหัสถูก, คืน '' ถ้าผิด
+ * ถ้ายังไม่ได้ตั้งรหัสไว้เลย จะปล่อยผ่านเป็น admin (ระบบเดิมใช้งานได้เหมือนเคย)
+ */
+function roleOf(pin) {
+  var props;
+  try { props = PropertiesService.getScriptProperties(); } catch (e) { return 'admin'; }
+
+  var admin = (props.getProperty('PIN_ADMIN') || '').trim();
+  var insp = (props.getProperty('PIN_INSPECTOR') || '').trim();
+
+  if (!admin && !insp) return 'admin';        // ยังไม่ได้เปิดใช้ระบบรหัส
+
+  pin = String(pin == null ? '' : pin).trim();
+  if (admin && pin === admin) return 'admin';
+  if (insp && pin === insp) return 'inspector';
+  return '';
+}
+
+/** ตั้ง / เปลี่ยน / ยกเลิกรหัส — สั่งจากเมนูในชีท */
+function setupPins() {
+  var ui = SpreadsheetApp.getUi();
+  var props = PropertiesService.getScriptProperties();
+
+  var cur = 'ตอนนี้: ผู้ดูแล = ' + (props.getProperty('PIN_ADMIN') ? 'ตั้งไว้แล้ว' : 'ยังไม่ได้ตั้ง') +
+            ' · ผู้ตรวจ = ' + (props.getProperty('PIN_INSPECTOR') ? 'ตั้งไว้แล้ว' : 'ยังไม่ได้ตั้ง');
+
+  var a = ui.prompt('รหัสผู้ดูแล (admin)',
+    cur + '\n\nใส่รหัสตัวเลขสำหรับผู้ดูแล — ดูหน้าสรุปและดึงข้อมูลได้\n' +
+    '(เว้นว่างแล้วกด OK = ไม่เปลี่ยนของเดิม)', ui.ButtonSet.OK_CANCEL);
+  if (a.getSelectedButton() !== ui.Button.OK) return;
+
+  var b = ui.prompt('รหัสผู้ตรวจ (inspector)',
+    'ใส่รหัสตัวเลขสำหรับผู้ตรวจหน้างาน — กรอกและบันทึกได้อย่างเดียว\n' +
+    '(เว้นว่างแล้วกด OK = ไม่เปลี่ยนของเดิม)', ui.ButtonSet.OK_CANCEL);
+  if (b.getSelectedButton() !== ui.Button.OK) return;
+
+  var av = a.getResponseText().trim();
+  var bv = b.getResponseText().trim();
+  if (av) props.setProperty('PIN_ADMIN', av);
+  if (bv) props.setProperty('PIN_INSPECTOR', bv);
+
+  if (av && bv && av === bv) {
+    ui.alert('รหัสซ้ำกัน', 'รหัสผู้ดูแลกับผู้ตรวจต้องไม่เหมือนกัน กรุณาตั้งใหม่', ui.ButtonSet.OK);
+    return;
+  }
+
+  ui.alert('ตั้งรหัสแล้ว',
+    'ผู้ดูแล: ' + (props.getProperty('PIN_ADMIN') || '(ยังไม่ได้ตั้ง)') + '\n' +
+    'ผู้ตรวจ: ' + (props.getProperty('PIN_INSPECTOR') || '(ยังไม่ได้ตั้ง)') + '\n\n' +
+    'อย่าลืมตั้ง REQUIRE_PIN = true ใน js/config.js แล้ว Deploy ใหม่\n' +
+    'ถ้าเพิ่งเปลี่ยนรหัส คนที่ใส่รหัสเก่าไว้จะถูกให้ใส่ใหม่เองตอนบันทึกครั้งถัดไป',
+    ui.ButtonSet.OK);
+}
+
+/** ยกเลิกระบบรหัสทั้งหมด กลับไปเปิดให้ทุกคนใช้ */
+function clearPins() {
+  var ui = SpreadsheetApp.getUi();
+  if (ui.alert('ยกเลิกระบบรหัส',
+      'ทุกคนที่มีลิงก์จะใช้งานได้ทุกอย่างโดยไม่ต้องใส่รหัส ยืนยันหรือไม่?',
+      ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+  var props = PropertiesService.getScriptProperties();
+  props.deleteProperty('PIN_ADMIN');
+  props.deleteProperty('PIN_INSPECTOR');
+  ui.alert('ยกเลิกแล้ว', 'อย่าลืมตั้ง REQUIRE_PIN = false ใน js/config.js ด้วย', ui.ButtonSet.OK);
 }
 
 /* ───────────────────────── helpers ───────────────────────── */

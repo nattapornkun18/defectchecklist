@@ -11,6 +11,7 @@
   }
 
   function postJson(url, payload) {
+    if (window.DCAuth) DCAuth.sign(payload);      // แนบรหัสไปด้วยทุกครั้ง
     return fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -443,6 +444,18 @@
     document.body.appendChild(bar);
   }
 
+  /** เข้ามาด้วยรหัสผู้ตรวจ = ดูหน้าสรุปไม่ได้ */
+  function blockNonAdmin() {
+    $('sub').textContent = 'ต้องใช้รหัสผู้ดูแล';
+    $('filterCard').hidden = true;
+    $('tiles').hidden = true;
+    $('legendCard').hidden = true;
+    $('tables').innerHTML = '<div class="card empty"><div class="big">🔒</div>' +
+      'หน้าสรุปเปิดให้เฉพาะผู้ดูแล<br>' +
+      '<span style="font-size:.84rem">กลับไปหน้าฟอร์ม → เมนู ⚙ → ออกจากระบบ ' +
+      'แล้วใส่รหัสผู้ดูแลอีกครั้ง</span></div>';
+  }
+
   /* ═════════ init ═════════ */
   $('dClose').addEventListener('click', function () { $('dlgDetail').close(); });
   $('dOk').addEventListener('click', function () { $('dlgDetail').close(); });
@@ -450,5 +463,13 @@
   $('btnReload').addEventListener('click', load);
   checkForUpdate();
   $('btnPrint').addEventListener('click', function () { window.print(); });
-  load();
+
+  if (window.DCAuth) {
+    DCAuth.ready(function (role) {
+      if (typeof REQUIRE_PIN === 'boolean' && REQUIRE_PIN && role !== 'admin') blockNonAdmin();
+      else load();
+    });
+  } else {
+    load();
+  }
 })();
