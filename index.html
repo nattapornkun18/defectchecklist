@@ -143,7 +143,7 @@
       <label for="fApiUrl">Web App URL (จาก Apps Script)</label>
       <input id="fApiUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec">
     </div>
-    <p>วางลิงก์จากขั้นตอน Deploy → New deployment → Web app (ดูวิธีทำใน README.md) ระบบจะจำไว้ในเครื่องนี้</p>
+    <p id="apiSrcNote">—</p>
     <div>
       <span class="status-dot" id="connDot"></span>
       <span id="connText" style="font-size:.83rem">ยังไม่ได้ทดสอบ</span>
@@ -157,6 +157,7 @@
     </div>
   </div>
   <div class="dlg-actions">
+    <button class="btn btn-ghost" id="btnResetConn" hidden>คืนค่าเริ่มต้น</button>
     <button class="btn btn-ghost" id="btnTestConn">ทดสอบการเชื่อมต่อ</button>
     <button class="btn btn-primary" id="btnSaveSettings">บันทึก</button>
   </div>
@@ -165,6 +166,7 @@
 <div class="toast" id="toast"></div>
 <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
 
+<script src="js/config.js"></script>
 <script src="js/checklist.js"></script>
 <script src="js/app.js"></script>
 </body>

@@ -597,7 +597,23 @@
     };
   }
 
-  function apiUrl() { return (localStorage.getItem(LS.api) || '').trim(); }
+  /** ค่าเริ่มต้นจาก config.js — ผู้ตรวจจึงไม่ต้องตั้งค่าอะไรเลย */
+  function defaultApiUrl() {
+    return (typeof API_URL === 'string' ? API_URL : '').trim();
+  }
+
+  /** ค่าที่ตั้งทับไว้เฉพาะเครื่องนี้ (ปกติไม่มี) */
+  function overrideApiUrl() {
+    return (localStorage.getItem(LS.api) || '').trim();
+  }
+
+  function apiUrl() { return overrideApiUrl() || defaultApiUrl(); }
+
+  function uploadPhotos() {
+    var v = localStorage.getItem(LS.photos);
+    if (v === null) return typeof UPLOAD_PHOTOS_DEFAULT === 'boolean' ? UPLOAD_PHOTOS_DEFAULT : true;
+    return v !== '0';
+  }
 
   function postJson(url, payload) {
     // text/plain เพื่อเลี่ยง CORS preflight ที่ Apps Script ไม่รองรับ
@@ -658,7 +674,7 @@
     if (t.done < t.total &&
         !confirm('ยังตรวจไม่ครบอีก ' + (t.total - t.done) + ' จุด\nต้องการบันทึกเลยหรือไม่?')) return;
 
-    var payload = buildPayload(localStorage.getItem(LS.photos) !== '0');
+    var payload = buildPayload(uploadPhotos());
     var btn = $('btnSave');
     btn.disabled = true; btn.textContent = 'กำลังบันทึก…';
 
@@ -673,6 +689,24 @@
     }).then(function () {
       btn.disabled = false; btn.textContent = 'บันทึก';
     });
+  }
+
+  /** บอกว่า URL ที่ใช้อยู่มาจากไหน — ค่าเริ่มต้นของระบบ หรือที่ตั้งทับไว้เครื่องนี้ */
+  function paintApiSource() {
+    var note = $('apiSrcNote'), reset = $('btnResetConn');
+    if (!note) return;
+    if (overrideApiUrl()) {
+      note.innerHTML = '⚠️ เครื่องนี้ตั้ง URL ทับค่าเริ่มต้นไว้ ' +
+        'ถ้าไม่ได้ตั้งใจให้กด "คืนค่าเริ่มต้น" เพื่อใช้ค่าเดียวกับเครื่องอื่น';
+      if (reset) reset.hidden = false;
+    } else if (defaultApiUrl()) {
+      note.textContent = '✓ ใช้ค่าเริ่มต้นที่ตั้งไว้ในระบบ (js/config.js) — ผู้ตรวจไม่ต้องกรอกอะไรเอง ' +
+        'แก้ที่นี่เฉพาะกรณีอยากให้เครื่องนี้ส่งไป Sheet คนละไฟล์';
+      if (reset) reset.hidden = true;
+    } else {
+      note.textContent = 'ยังไม่ได้ตั้งค่าเริ่มต้นใน js/config.js — วาง Web App URL ที่ได้จาก Apps Script ที่นี่';
+      if (reset) reset.hidden = true;
+    }
   }
 
   /* ═════════ banners ═════════ */
@@ -828,16 +862,30 @@
 
     $('btnSettings').addEventListener('click', function () {
       $('fApiUrl').value = apiUrl();
-      $('fUploadPhotos').checked = localStorage.getItem(LS.photos) !== '0';
+      $('fUploadPhotos').checked = uploadPhotos();
+      paintApiSource();
       $('dlgSettings').showModal();
     });
+
     $('btnSaveSettings').addEventListener('click', function () {
-      localStorage.setItem(LS.api, $('fApiUrl').value.trim());
+      var v = $('fApiUrl').value.trim();
+      // ตรงกับค่าเริ่มต้นอยู่แล้ว = ไม่ต้องเก็บทับ จะได้อัปเดตตามโค้ดเสมอ
+      if (!v || v === defaultApiUrl()) localStorage.removeItem(LS.api);
+      else localStorage.setItem(LS.api, v);
       localStorage.setItem(LS.photos, $('fUploadPhotos').checked ? '1' : '0');
+      paintApiSource();
       $('dlgSettings').close();
       renderBanners();
       flushQueue(true);
       toast('บันทึกการตั้งค่าแล้ว', 'ok');
+    });
+
+    $('btnResetConn').addEventListener('click', function () {
+      localStorage.removeItem(LS.api);
+      $('fApiUrl').value = defaultApiUrl();
+      paintApiSource();
+      renderBanners();
+      toast('กลับมาใช้ค่าเริ่มต้นของระบบแล้ว', 'ok');
     });
     $('btnTestConn').addEventListener('click', function () {
       var url = $('fApiUrl').value.trim(), dot = $('connDot'), txt = $('connText');

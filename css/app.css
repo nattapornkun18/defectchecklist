@@ -225,6 +225,8 @@ button { cursor: pointer; border: none; background: none; }
 .btn-ghost { background: var(--surface-2); color: var(--text); border: 1px solid var(--line); }
 .btn-block { width: 100%; }
 .btn[disabled] { opacity: .5; pointer-events: none; }
+/* display:inline-flex ของ .btn ทับ UA style ของ [hidden] จึงต้องประกาศเอง */
+[hidden] { display: none !important; }
 
 .bottom-bar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
