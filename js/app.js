@@ -1055,6 +1055,26 @@
   }
 
 
+  /**
+   * บอก Apps Script ว่า room type นี้มีหมวดอะไรบ้าง
+   * ทำครั้งเดียวต่อเวอร์ชัน เพื่อให้ชีทสรุปมีคอลัมน์ครบทุกหมวด
+   * แม้บางหมวดจะไม่เคยเจอ defect เลย
+   */
+  function registerCatalog() {
+    var url = apiUrl();
+    if (!url) return;
+    var tag = ROOM_TYPE + '@' + (typeof ASSET_VERSION === 'string' ? ASSET_VERSION : '');
+    if (localStorage.getItem('dc:catReg') === tag) return;
+
+    postJson(url, {
+      action: 'registerCatalog',
+      roomType: ROOM_TYPE,
+      catalog: CATEGORIES.map(function (c) { return { no: c.no, name: c.name, th: c.th }; }),
+    }).then(function () {
+      localStorage.setItem('dc:catReg', tag);
+    }).catch(function () { /* ออฟไลน์อยู่ ไว้ค่อยลองใหม่คราวหน้า */ });
+  }
+
   /* ═════════ ตรวจว่ามีเวอร์ชันใหม่หรือยัง ═════════ */
   /* ?v= กันแคชได้แค่ css/js/รูป แต่ตัวไฟล์ HTML เองยังถูกแคชได้
      จึงถาม version.json ตรง ๆ แบบไม่ผ่านแคช แล้วเทียบกับเวอร์ชันที่โหลดมาจริง */
@@ -1095,4 +1115,5 @@
   renderBanners();
   flushQueue(true);
   checkForUpdate();
+  registerCatalog();
 })();

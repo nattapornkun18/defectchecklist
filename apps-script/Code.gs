@@ -58,6 +58,10 @@ function doPost(e) {
 
     if (action === 'submit') return json(handleSubmit(body));
 
+    // หน้าเว็บส่งรายชื่อหมวดมาลงทะเบียนเอง ตอนเปิดหน้าครั้งแรกของแต่ละเวอร์ชัน
+    // ทำให้ชีทสรุปมีคอลัมน์ครบโดยไม่ต้องรอให้ใครกดบันทึกก่อน
+    if (action === 'registerCatalog') return json(handleRegisterCatalog(body));
+
     // สามอย่างนี้เป็นการ "อ่านข้อมูลออกไป" จึงให้เฉพาะผู้ดูแล
     if (who !== 'admin') {
       return json({ ok: false, error: 'ต้องใช้รหัสผู้ดูแล (admin) สำหรับคำสั่งนี้' });
@@ -166,6 +170,24 @@ function handleSubmit(p) {
   } finally {
     lock.releaseLock();
   }
+}
+
+/** เก็บรายชื่อหมวดของ room type ไว้ใช้ทำคอลัมน์ในชีทสรุป */
+function handleRegisterCatalog(p) {
+  if (!p.roomType) return { ok: false, error: 'ไม่ได้ระบุ roomType' };
+  if (!p.catalog || !p.catalog.length) return { ok: false, error: 'ไม่มีรายชื่อหมวด' };
+
+  var key = 'cats:' + p.roomType;
+  var props = PropertiesService.getScriptProperties();
+  var before = props.getProperty(key);
+  var after = JSON.stringify(p.catalog);
+  props.setProperty(key, after);
+
+  // ถ้ารายชื่อหมวดเปลี่ยน ต้องสร้างชีทสรุปใหม่ให้คอลัมน์ตรง
+  var changed = before !== after;
+  if (changed) { try { buildSummarySheet(); } catch (e) { /* ไม่เป็นไร */ } }
+
+  return { ok: true, cats: p.catalog.length, changed: changed };
 }
 
 /**
