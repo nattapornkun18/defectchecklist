@@ -97,6 +97,9 @@
 > ระบบสร้างชีท `Inspections` และ `DefectLog` ให้อัตโนมัติตอนบันทึกครั้งแรก
 > ถ้าอยากสร้างล่วงหน้า เลือกฟังก์ชัน `setupSheets` ใน Apps Script แล้วกด Run
 
+หลังวางโค้ดแล้วรีเฟรชหน้าชีท จะมีเมนู **Defect Checklist** โผล่บนแถบเมนู
+รวมคำสั่งดูแลระบบไว้ทั้งหมด — อธิบายแต่ละอันไว้ที่ [`docs/apps-script-menu.md`](docs/apps-script-menu.md)
+
 ### 2) เอาหน้าเว็บขึ้นออนไลน์
 
 ง่ายที่สุดคือ **GitHub Pages** (ฟรี ไม่ต้องมีเซิร์ฟเวอร์):
@@ -391,6 +394,8 @@ css/summary.css       สไตล์หน้าสรุป
 js/tag.js             ตรรกะของ tag.html
 img/cat01–cat10.jpg   รูปถ่ายอ้างอิงพร้อมหมายเลขจุดตรวจ (รวม ~1.3 MB)
 apps-script/Code.gs   สคริปต์ฝั่ง Google Sheet
+docs/apps-script-menu.md  คู่มือ Custom Menu ในชีท — สร้างเองยังไง ทำอะไรได้บ้าง
+tools/bump.mjs        สคริปต์บวกเลขเวอร์ชันให้ครบทุกที่
 ```
 
 ไม่ต้อง build ไม่ต้องลง dependency — เป็น static file ล้วน วางที่ไหนก็รันได้
