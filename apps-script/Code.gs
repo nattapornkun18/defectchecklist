@@ -46,6 +46,8 @@ function doPost(e) {
       });
     }
     if (action === 'submit') return json(handleSubmit(body));
+    if (action === 'load') return json(handleLoad(body));
+    if (action === 'summary') return json(handleSummary(body));
 
     return json({ ok: false, error: 'ไม่รู้จัก action: ' + action });
   } catch (err) {
@@ -125,7 +127,113 @@ function handleSubmit(p) {
   }
 }
 
+/**
+ * ดึงผลตรวจที่บันทึกไว้แล้วกลับไปแสดงในหน้าเว็บ (two-way)
+ * รับ { inspectionId } หรือ { room, date, round } — ถ้าไม่ระบุ date/round จะเอาครั้งล่าสุดของห้องนั้น
+ */
+function handleLoad(p) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sumSheet = ss.getSheetByName(SHEET_SUMMARY);
+  var detSheet = ss.getSheetByName(SHEET_DETAIL);
+  if (!sumSheet || sumSheet.getLastRow() < 2) return { ok: true, found: false };
+
+  var rows = sumSheet.getRange(2, 1, sumSheet.getLastRow() - 1, HEAD_SUMMARY.length).getValues();
+  var hit = null;
+
+  if (p.inspectionId) {
+    for (var i = rows.length - 1; i >= 0; i--) {
+      if (String(rows[i][1]) === String(p.inspectionId)) { hit = rows[i]; break; }
+    }
+  } else if (p.room) {
+    // ไล่จากล่างขึ้นบน = ได้แถวที่บันทึกล่าสุดก่อน
+    for (var j = rows.length - 1; j >= 0; j--) {
+      if (String(rows[j][2]) !== String(p.room)) continue;
+      if (p.date && dateKey(rows[j][6]) !== String(p.date)) continue;
+      if (p.round && String(rows[j][4]) !== String(p.round)) continue;
+      hit = rows[j]; break;
+    }
+  }
+  if (!hit) return { ok: true, found: false };
+
+  var id = String(hit[1]);
+  var items = [];
+  if (detSheet && detSheet.getLastRow() >= 2) {
+    var d = detSheet.getRange(2, 1, detSheet.getLastRow() - 1, HEAD_DETAIL.length).getValues();
+    for (var k = 0; k < d.length; k++) {
+      if (String(d[k][1]) !== id) continue;
+      items.push({
+        cat: String(d[k][7]),          // ชื่อหมวดภาษาอังกฤษ
+        no: num(d[k][9]),
+        result: d[k][11] === 'ส่งคืน' ? 'return' : d[k][11] === 'แก้เอง' ? 'fix' : 'pass',
+        qty: num(d[k][12]),
+        note: String(d[k][13] || ''),
+        photos: String(d[k][14] || '').split('\n').filter(String)
+      });
+    }
+  }
+
+  return {
+    ok: true, found: true,
+    inspection: {
+      inspectionId: id, room: String(hit[2]), roomType: String(hit[3]),
+      round: String(hit[4]), inspector: String(hit[5]), date: dateKey(hit[6]),
+      total: num(hit[7]), checked: num(hit[8]), pass: num(hit[9]),
+      ret: num(hit[10]), fix: num(hit[11]), defectQty: num(hit[12]),
+      note: String(hit[14] || ''), savedAt: iso(hit[0])
+    },
+    items: items
+  };
+}
+
+/** สรุปจำนวน defect ต่อห้อง แยกตามหมวด — ใช้กับหน้า summary.html */
+function handleSummary(p) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sumSheet = ss.getSheetByName(SHEET_SUMMARY);
+  var detSheet = ss.getSheetByName(SHEET_DETAIL);
+  if (!sumSheet || sumSheet.getLastRow() < 2) return { ok: true, inspections: [] };
+
+  var rows = sumSheet.getRange(2, 1, sumSheet.getLastRow() - 1, HEAD_SUMMARY.length).getValues();
+  var byId = {}, order = [];
+  rows.forEach(function (r) {
+    var id = String(r[1]);
+    if (!byId[id]) order.push(id);
+    byId[id] = {                       // แถวหลังทับแถวก่อน = ได้ข้อมูลล่าสุด
+      inspectionId: id, room: String(r[2]), roomType: String(r[3]),
+      round: String(r[4]), inspector: String(r[5]), date: dateKey(r[6]),
+      total: num(r[7]), checked: num(r[8]), pass: num(r[9]),
+      ret: num(r[10]), fix: num(r[11]), defectQty: num(r[12]),
+      note: String(r[14] || ''), savedAt: iso(r[0]), cats: {}
+    };
+  });
+
+  if (detSheet && detSheet.getLastRow() >= 2) {
+    var d = detSheet.getRange(2, 1, detSheet.getLastRow() - 1, HEAD_DETAIL.length).getValues();
+    d.forEach(function (r) {
+      var insp = byId[String(r[1])];
+      if (!insp) return;
+      var cat = String(r[7]);
+      var c = insp.cats[cat] ||
+        (insp.cats[cat] = { ret: 0, fix: 0, qty: 0, retQty: 0, fixQty: 0 });
+      var q = Math.max(1, num(r[12]));
+      if (r[11] === 'ส่งคืน') { c.ret++; c.retQty += q; c.qty += q; }
+      else if (r[11] === 'แก้เอง') { c.fix++; c.fixQty += q; c.qty += q; }
+    });
+  }
+
+  return { ok: true, inspections: order.map(function (id) { return byId[id]; }) };
+}
+
 /* ───────────────────────── helpers ───────────────────────── */
+
+/** คืนวันที่รูปแบบ YYYY-MM-DD ไม่ว่าเซลล์จะเก็บเป็น Date หรือข้อความ */
+function dateKey(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  return String(v || '').slice(0, 10);
+}
+
+function iso(v) {
+  return v instanceof Date ? v.toISOString() : String(v || '');
+}
 
 function ensureSheet(ss, name, headers) {
   var sh = ss.getSheetByName(name);

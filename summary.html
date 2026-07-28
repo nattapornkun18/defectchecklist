@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14607a">
+<title>สรุปผลตรวจ Defect — 10 Deluxe King Right</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314607a'/%3E%3Crect x='8' y='16' width='4' height='9' fill='%23fff'/%3E%3Crect x='14' y='11' width='4' height='14' fill='%23fff'/%3E%3Crect x='20' y='7' width='4' height='18' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/app.css?v=4">
+<link rel="stylesheet" href="css/summary.css?v=4">
+</head>
+<body>
+
+<div class="screen active">
+  <header class="topbar">
+    <div class="topbar-row">
+      <a class="icon-btn" href="index.html" title="กลับไปหน้าฟอร์ม" style="text-decoration:none">←</a>
+      <div style="min-width:0;flex:1">
+        <h1>สรุปผลตรวจ Defect</h1>
+        <div class="sub" id="sub">กำลังโหลด…</div>
+      </div>
+      <button class="icon-btn" id="btnPrint" title="พิมพ์ / บันทึก PDF">🖨</button>
+      <button class="icon-btn" id="btnReload" title="โหลดใหม่">⟳</button>
+    </div>
+  </header>
+
+  <div id="banners"></div>
+
+  <!-- ══════════ ตัวกรอง ══════════ -->
+  <section class="card no-print" id="filterCard" hidden>
+    <div class="filters">
+      <div class="field">
+        <label for="fRound">รอบตรวจ</label>
+        <select id="fRound"><option value="">ทุกรอบ</option></select>
+      </div>
+      <div class="field">
+        <label for="fFrom">ตั้งแต่วันที่</label>
+        <input id="fFrom" type="date">
+      </div>
+      <div class="field">
+        <label for="fTo">ถึงวันที่</label>
+        <input id="fTo" type="date">
+      </div>
+      <div class="field">
+        <label for="fMode">นับจาก</label>
+        <select id="fMode">
+          <option value="all">ส่งคืน + แก้เอง</option>
+          <option value="return">ส่งคืน อย่างเดียว</option>
+          <option value="fix">แก้เอง อย่างเดียว</option>
+        </select>
+      </div>
+    </div>
+    <p class="filter-note" id="filterNote">—</p>
+  </section>
+
+  <!-- ══════════ ตัวเลขรวม ══════════ -->
+  <section class="tiles" id="tiles" hidden></section>
+
+  <!-- ══════════ ตารางสรุป ══════════ -->
+  <div id="tables"></div>
+
+  <div class="card no-print" id="legendCard" hidden>
+    <h2>วิธีอ่านตาราง</h2>
+    <div class="ramp-legend">
+      <span class="lbl">น้อย</span>
+      <span class="ramp"></span>
+      <span class="lbl">มาก</span>
+      <span class="note">ยิ่งเข้ม = พบ defect เยอะ · ตัวเลขในช่องคือจำนวนจุดที่พบ</span>
+    </div>
+  </div>
+
+  <div style="height:24px"></div>
+</div>
+
+<div class="tooltip" id="tip" hidden></div>
+<div class="toast" id="toast"></div>
+
+<script src="js/config.js?v=4"></script>
+<script src="js/checklist.js?v=4"></script>
+<script src="js/summary.js?v=4"></script>
+</body>
+</html>

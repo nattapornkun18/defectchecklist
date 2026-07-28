@@ -691,6 +691,77 @@
     });
   }
 
+  /**
+   * ดึงผลตรวจที่บันทึกไว้ในชีทกลับมาลงเครื่อง (two-way)
+   * ทับข้อมูลในเครื่องทั้งชุด จึงถามยืนยันก่อนเสมอถ้ามีของค้างอยู่
+   */
+  function loadFromSheet() {
+    var url = apiUrl();
+    if (!url) { toast('ยังไม่ได้ตั้งค่า Web App URL', 'err'); $('dlgSettings').showModal(); return; }
+
+    var btn = $('btnLoad');
+    btn.disabled = true; btn.textContent = 'กำลังดึง…';
+
+    postJson(url, { action: 'load', room: state.room, date: state.date, round: state.round })
+      .then(function (res) {
+        if (!res.found) {
+          // ไม่เจอของ วัน+รอบ นี้ ลองหาครั้งล่าสุดของห้องนี้แทน
+          return postJson(url, { action: 'load', room: state.room }).then(function (r2) {
+            if (!r2.found) { toast('ยังไม่มีข้อมูลของห้อง ' + state.room + ' ในชีท', 'err', 4000); return null; }
+            if (!confirm('ไม่พบข้อมูลของ ' + state.date + ' รอบ "' + state.round + '"\n\n' +
+                         'พบครั้งล่าสุดคือ ' + r2.inspection.date + ' รอบ "' + r2.inspection.round + '"\n' +
+                         'ต้องการดึงชุดนั้นมาแทนหรือไม่?')) return null;
+            return r2;
+          });
+        }
+        return res;
+      })
+      .then(function (res) {
+        if (!res) return;
+        var local = statsOf(allItems());
+        if (local.done && !confirm('ในเครื่องนี้มีผลตรวจอยู่ ' + local.done + ' จุด\n\n' +
+                                   'การดึงข้อมูลจะทับของเดิมทั้งหมด ยืนยันหรือไม่?')) return;
+        applyLoaded(res.inspection, res.items);
+        toast('ดึงข้อมูลจากชีทแล้ว — ' + res.items.length + ' จุดที่เป็น defect', 'ok', 4000);
+      })
+      .catch(function (err) { toast('ดึงข้อมูลไม่สำเร็จ: ' + err.message, 'err', 5000); })
+      .then(function () { btn.disabled = false; btn.textContent = '⭳ ดึงข้อมูลจาก Sheet'; });
+  }
+
+  /** เขียนผลที่ดึงมาลง state — จุดที่ไม่อยู่ในรายการ defect คือ "ผ่าน" */
+  function applyLoaded(insp, items) {
+    var byCat = {};
+    CATEGORIES.forEach(function (c) { byCat[c.name] = c; });
+
+    state = blankState(insp.room);
+    state.round = insp.round || state.round;
+    state.inspector = insp.inspector || state.inspector;
+    state.date = insp.date || state.date;
+    state.note = insp.note || '';
+
+    var missed = 0;
+    items.forEach(function (it) {
+      var cat = byCat[it.cat];
+      if (!cat) { missed++; return; }
+      state.items[cat.id + '-' + it.no] = {
+        r: it.result, qty: Math.max(1, it.qty || 1),
+        note: it.note || '', photos: [],           // รูปอยู่บน Drive แล้ว ไม่ดึงกลับมากินพื้นที่
+        photoUrls: it.photos || []
+      };
+    });
+
+    // ชีทเก็บเฉพาะ defect — ที่เหลือคือผ่าน (ตรงกับตอนบันทึก)
+    if (insp.checked >= insp.total) {
+      allItems().forEach(function (x) { if (!state.items[x.key]) state.items[x.key] = { r: 'pass', qty: 1, note: '', photos: [] }; });
+    }
+
+    state.submittedAt = insp.savedAt || new Date().toISOString();
+    saveDraft();
+    switchRoom(insp.room);
+    if (openCat) { renderItems(); renderPins(); refreshCat(); }
+    if (missed) toast('มี ' + missed + ' แถวที่หมวดไม่ตรงกับฟอร์มปัจจุบัน ข้ามไป', 'err', 5000);
+  }
+
   function submit() {
     var url = apiUrl();
     if (!url) { toast('ยังไม่ได้ตั้งค่า Web App URL', 'err'); $('dlgSettings').showModal(); return; }
@@ -884,6 +955,7 @@
     bindViewer();
 
     $('btnSave').addEventListener('click', submit);
+    $('btnLoad').addEventListener('click', loadFromSheet);
 
     $('btnReset').addEventListener('click', function () {
       if (!confirm('ล้างผลตรวจของห้อง ' + state.room + ' ทั้งหมด?\nข้อมูลที่บันทึกลง Sheet ไปแล้วจะไม่ถูกลบ')) return;

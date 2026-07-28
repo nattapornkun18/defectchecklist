@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#14607a">
 <title>Defect Checklist — 10 Deluxe King Right</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314607a'/%3E%3Cpath d='M9 16.5l4.5 4.5L23 11.5' stroke='%23fff' stroke-width='3.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="css/app.css?v=3">
+<link rel="stylesheet" href="css/app.css?v=4">
 </head>
 <body>
 
@@ -58,6 +58,13 @@
         <input id="fNote" type="text" placeholder="เช่น ตรวจร่วมกับผู้รับเหมา">
       </div>
     </div>
+    <div style="display:flex;gap:8px;margin-top:11px;flex-wrap:wrap">
+      <button class="btn btn-ghost" id="btnLoad" style="flex:1;min-width:150px">⭳ ดึงข้อมูลจาก Sheet</button>
+      <a class="btn btn-ghost" href="summary.html" style="flex:1;min-width:150px;text-decoration:none">📊 หน้าสรุปรวม</a>
+    </div>
+    <p style="margin:8px 0 0;font-size:.76rem;color:var(--muted)" id="loadHint">
+      ใช้ตอนตรวจต่อจากเครื่องอื่น หรือมีคนแก้ข้อมูลในชีทแล้วอยากดึงกลับมา
+    </p>
   </section>
 
   <section class="card no-print">
@@ -176,8 +183,8 @@
 <div class="toast" id="toast"></div>
 <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
 
-<script src="js/config.js?v=3"></script>
-<script src="js/checklist.js?v=3"></script>
-<script src="js/app.js?v=3"></script>
+<script src="js/config.js?v=4"></script>
+<script src="js/checklist.js?v=4"></script>
+<script src="js/app.js?v=4"></script>
 </body>
 </html>

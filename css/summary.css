@@ -1,0 +1,99 @@
+/* summary.css — หน้าสรุปผลตรวจ */
+
+/* ลำดับความเข้มของสี (sequential hue เดียว อ่อน → เข้ม)
+   ตัวเลขพิมพ์อยู่ในช่องเสมอ สีเป็นแค่ตัวช่วยอ่าน ไม่ได้สื่อความหมายเดี่ยว ๆ */
+:root {
+  --heat-0: #ffffff;
+  --heat-1: #fdeceb;
+  --heat-2: #fad3d1;
+  --heat-3: #f4aeaa;
+  --heat-4: #e8817c;
+  --heat-5: #d4534d;
+  --heat-6: #ad2f2a;
+}
+
+.filters { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (min-width: 640px) { .filters { grid-template-columns: repeat(4, 1fr); } }
+.filter-note { margin: 10px 0 0; font-size: .78rem; color: var(--muted); }
+
+/* ── ตัวเลขรวมด้านบน ── */
+.tiles {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 10px; margin: 13px;
+}
+@media (min-width: 700px) { .tiles { grid-template-columns: repeat(4, 1fr); } }
+.tile {
+  background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 12px 13px;
+}
+.tile .k { font-size: .75rem; color: var(--muted); font-weight: 600; }
+.tile .v { font-size: 1.55rem; font-weight: 800; line-height: 1.15; margin-top: 3px; }
+.tile .s { font-size: .74rem; color: var(--muted); margin-top: 2px; }
+.tile .v.bad { color: var(--return); }
+
+/* ── ตารางสรุป ── */
+.tbl-card {
+  background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+  margin: 13px; overflow: hidden;
+}
+.tbl-head {
+  padding: 11px 13px; border-bottom: 1px solid var(--line);
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+}
+.tbl-head h2 { margin: 0; font-size: .95rem; font-weight: 700; }
+.tbl-head .meta { font-size: .76rem; color: var(--muted); }
+
+.tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.sum { border-collapse: separate; border-spacing: 0; width: 100%; font-size: .82rem; }
+table.sum th, table.sum td { padding: 7px 9px; text-align: center; white-space: nowrap; }
+table.sum thead th {
+  background: var(--surface-2); color: var(--muted); font-size: .74rem; font-weight: 700;
+  border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 2;
+}
+table.sum th.room, table.sum td.room {
+  text-align: start; position: sticky; inset-inline-start: 0; z-index: 1;
+  background: var(--surface); border-inline-end: 1px solid var(--line); font-weight: 700;
+}
+table.sum thead th.room { z-index: 3; background: var(--surface-2); }
+table.sum tbody tr:not(:last-child) td { border-bottom: 1px solid #eef1f6; }
+table.sum td.num { font-variant-numeric: tabular-nums; }
+table.sum td.zero { color: #b7bfcc; }
+table.sum td.cell { cursor: default; }
+table.sum td.cell.hot { color: #fff; font-weight: 700; }
+table.sum td.total { font-weight: 800; background: #f6f8fb; }
+table.sum td.pct { font-weight: 700; }
+table.sum tr.grand td { background: #eaf0f5; font-weight: 800; border-top: 2px solid var(--line); }
+table.sum tr.grand td.room { background: #eaf0f5; }
+table.sum tr.none td { color: var(--muted); font-style: italic; }
+
+.ramp-legend { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font-size: .78rem; color: var(--muted); }
+.ramp-legend .ramp {
+  width: 150px; height: 12px; border-radius: 4px; border: 1px solid var(--line);
+  background: linear-gradient(90deg, var(--heat-0), var(--heat-1), var(--heat-2),
+              var(--heat-3), var(--heat-4), var(--heat-5), var(--heat-6));
+}
+.ramp-legend .note { flex-basis: 100%; }
+
+.tooltip {
+  position: fixed; z-index: 90; pointer-events: none;
+  background: #172033; color: #fff; border-radius: 9px; padding: 8px 11px;
+  font-size: .78rem; line-height: 1.45; max-width: 230px;
+  box-shadow: 0 6px 20px rgba(16, 24, 38, .3);
+}
+.tooltip b { font-weight: 700; }
+.tooltip .r { color: #ff9f9f; }
+.tooltip .f { color: #f7c66a; }
+
+.empty { text-align: center; padding: 34px 18px; color: var(--muted); }
+.empty .big { font-size: 2rem; }
+
+@media print {
+  .topbar, .no-print, .tooltip, .toast { display: none !important; }
+  .tbl-card, .tile { box-shadow: none; border: 1px solid #bbb; }
+  .tiles { margin: 0 0 4mm; }
+  .tbl-card { margin: 0 0 5mm; break-inside: avoid; }
+  .tbl-scroll { overflow: visible; }
+  table.sum { font-size: 8.5pt; }
+  table.sum th, table.sum td { border: .4pt solid #999; padding: 1mm 1.5mm; }
+  body { background: #fff; }
+}
