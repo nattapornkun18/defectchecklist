@@ -50,6 +50,12 @@ function doPost(e) {
     var who = roleOf(body.pin);
 
     if (action === 'auth') {
+      // หน้าเว็บเปิดใช้รหัสแล้ว แต่ในชีทยังไม่ได้ตั้ง = ตั้งค่าไม่ครบ ต้องบอกให้รู้
+      // ไม่งั้นจะกลายเป็นใส่รหัสอะไรก็ผ่าน โดยไม่มีอะไรเตือน
+      if (body.expectPin && !pinsConfigured()) {
+        return json({ ok: false, error: 'ยังไม่ได้ตั้งรหัสในชีท — ' +
+          'เปิดชีทแล้วไปที่เมนู Defect Checklist → 🔑 ตั้งรหัสเข้าใช้งาน ก่อน' });
+      }
       return json(who
         ? { ok: true, role: who }
         : { ok: false, error: 'รหัสไม่ถูกต้อง' });
@@ -652,6 +658,15 @@ function showLastSummaryError() {
  * คืนค่า 'admin' / 'inspector' ถ้ารหัสถูก, คืน '' ถ้าผิด
  * ถ้ายังไม่ได้ตั้งรหัสไว้เลย จะปล่อยผ่านเป็น admin (ระบบเดิมใช้งานได้เหมือนเคย)
  */
+/** ตั้งรหัสไว้แล้วอย่างน้อย 1 อัน หรือยัง */
+function pinsConfigured() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    return !!((props.getProperty('PIN_ADMIN') || '').trim() ||
+              (props.getProperty('PIN_INSPECTOR') || '').trim());
+  } catch (e) { return false; }
+}
+
 function roleOf(pin) {
   var props;
   try { props = PropertiesService.getScriptProperties(); } catch (e) { return 'admin'; }

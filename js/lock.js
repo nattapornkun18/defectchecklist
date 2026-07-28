@@ -111,7 +111,7 @@
     busy = true;
     msg('กำลังตรวจสอบ…');
 
-    post({ action: 'auth', pin: buf }).then(function (r) {
+    post({ action: 'auth', pin: buf, expectPin: true }).then(function (r) {
       if (!r || r.ok !== true) throw new Error((r && r.error) || 'รหัสไม่ถูกต้อง');
       localStorage.setItem(K_PIN, buf);
       localStorage.setItem(K_ROLE, r.role || 'inspector');
@@ -125,7 +125,7 @@
       el.querySelector('.lock-box').classList.add('shake');
       msg(/HTTP|Failed|NetworkError/.test(err.message)
         ? 'ต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจสัญญาณแล้วลองใหม่'
-        : 'รหัสไม่ถูกต้อง', 'err');
+        : err.message || 'รหัสไม่ถูกต้อง', 'err');
     });
   }
 
