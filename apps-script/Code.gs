@@ -455,7 +455,8 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Defect Checklist')
     .addItem('อัปเดตชีทสรุปรวม', 'buildSummarySheet')
-    .addItem('ลบผลตรวจ 1 ครั้ง (ตาม InspectionID)', 'deleteInspectionByPrompt')
+    .addItem('🗑 ลบผลตรวจของแถวที่เลือก', 'deleteSelectedInspection')
+    .addItem('ลบผลตรวจ (พิมพ์ InspectionID เอง)', 'deleteInspectionByPrompt')
     .addItem('ดูข้อผิดพลาดล่าสุดของชีทสรุป', 'showLastSummaryError')
     .addItem('🔍 ตรวจสอบระบบ (diagnose)', 'diagnose')
     .addItem('สร้างชีทที่จำเป็น', 'setupSheets')
@@ -463,8 +464,34 @@ function onOpen() {
 }
 
 /**
- * ลบผลตรวจของการตรวจ 1 ครั้งออกจากชีท (ทั้ง Inspections และ DefectLog)
- * ใช้ตอนกดบันทึกผิดห้อง หรืออยากเคลียร์ข้อมูลทดลองทิ้ง
+ * ลบผลตรวจของ "แถวที่เลือกอยู่" — วิธีที่สะดวกที่สุด
+ * คลิกแถวไหนก็ได้ในชีท Inspections หรือ DefectLog แล้วสั่งจากเมนู
+ */
+function deleteSelectedInspection() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getActiveSheet();
+  var name = sh.getName();
+
+  if (name !== SHEET_SUMMARY && name !== SHEET_DETAIL) {
+    ui.alert('เลือกแถวก่อน',
+      'ให้ไปที่แท็บ "' + SHEET_SUMMARY + '" (หรือ "' + SHEET_DETAIL + '")\n' +
+      'คลิกที่แถวของผลตรวจที่จะลบ แล้วค่อยสั่งเมนูนี้อีกครั้ง',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  var row = sh.getActiveRange().getRow();
+  if (row < 2) { ui.alert('แถวที่เลือกเป็นหัวตาราง ไม่ใช่ข้อมูล'); return; }
+
+  var id = String(sh.getRange(row, 2).getValue()).trim();   // คอลัมน์ B = InspectionID
+  if (!id) { ui.alert('แถวนี้ไม่มี InspectionID'); return; }
+
+  removeInspection(id, ui);
+}
+
+/**
+ * ลบผลตรวจโดยพิมพ์ InspectionID เอง (สำรอง เผื่อหาแถวไม่เจอ)
  */
 function deleteInspectionByPrompt() {
   var ui = SpreadsheetApp.getUi();
@@ -476,20 +503,35 @@ function deleteInspectionByPrompt() {
 
   var id = res.getResponseText().trim();
   if (!id) { ui.alert('ไม่ได้ใส่ InspectionID'); return; }
+  removeInspection(id, ui);
+}
 
+/** ลบจริง — ใช้ร่วมกันทั้งสองวิธี */
+function removeInspection(id, ui) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sumSheet = ss.getSheetByName(SHEET_SUMMARY);
   var detSheet = ss.getSheetByName(SHEET_DETAIL);
 
-  var found = 0;
+  // หารายละเอียดมาแสดงตอนยืนยัน จะได้ไม่ลบผิดแถว
+  var info = '', defects = 0;
   if (sumSheet && sumSheet.getLastRow() >= 2) {
-    sumSheet.getRange(2, 2, sumSheet.getLastRow() - 1, 1).getValues()
-      .forEach(function (r) { if (String(r[0]) === id) found++; });
+    sumSheet.getRange(2, 1, sumSheet.getLastRow() - 1, HEAD_SUMMARY.length).getValues()
+      .forEach(function (r) {
+        if (String(r[1]) !== id) return;
+        info = 'ห้อง ' + r[2] + ' · ' + r[4] + ' · ' + dateKey(r[6]) +
+               ' · ผู้ตรวจ ' + r[5] + '\nพบ defect ' + num(r[12]) + ' จุด';
+      });
   }
-  if (!found) { ui.alert('ไม่พบ InspectionID นี้ในชีท Inspections'); return; }
+  if (!info) { ui.alert('ไม่พบ InspectionID "' + id + '" ในชีท ' + SHEET_SUMMARY); return; }
+
+  if (detSheet && detSheet.getLastRow() >= 2) {
+    detSheet.getRange(2, 2, detSheet.getLastRow() - 1, 1).getValues()
+      .forEach(function (r) { if (String(r[0]) === id) defects++; });
+  }
 
   if (ui.alert('ยืนยันการลบ',
-      'จะลบผลตรวจ "' + id + '" ออกจากทั้ง Inspections และ DefectLog\n' +
+      info + '\n\nจะลบออกจาก ' + SHEET_SUMMARY + ' 1 แถว และ ' +
+      SHEET_DETAIL + ' ' + defects + ' แถว\n' +
       'ลบแล้วกู้คืนไม่ได้ ยืนยันหรือไม่?',
       ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
 
@@ -502,7 +544,8 @@ function deleteInspectionByPrompt() {
   } finally {
     lock.releaseLock();
   }
-  ui.alert('ลบเรียบร้อย และอัปเดตชีทสรุปรวมให้แล้ว');
+  ui.alert('ลบเรียบร้อย', 'ลบ "' + id + '" แล้ว และอัปเดตชีทสรุปรวมให้ด้วย',
+    ui.ButtonSet.OK);
 }
 
 /**
