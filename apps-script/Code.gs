@@ -375,14 +375,16 @@ function buildSummarySheet() {
       vals.forEach(function (v, ix) { colTotals[ix] += v; });
       var pts = i.total || 0;
 
-      rows.push([i.room, rt, pts ? tot / pts : 0, tot]
+      // นำหน้าด้วย ' เพื่อให้เป็นข้อความ ไม่งั้นห้อง "03" จะกลายเป็น 3
+      rows.push(["'" + i.room, rt, pts ? tot / pts : 0, tot]
         .concat(vals)
         .concat([i.date, i.round, i.inspector]));
-      fmt.push({ type: 'data', row: rows.length, first: 5, vals: vals, cols: header.length });
+      fmt.push({ type: 'data', row: rows.length, first: 5, vals: vals,
+                 cols: header.length, nCats: cats.length });
     });
 
     rows.push(['รวมทั้งกลุ่ม', '', '', grand].concat(colTotals).concat(['', '', '']));
-    fmt.push({ type: 'total', row: rows.length, cols: header.length });
+    fmt.push({ type: 'total', row: rows.length, cols: header.length, nCats: cats.length });
     rows.push([]);
   });
 
@@ -411,8 +413,12 @@ function buildSummarySheet() {
       sh.getRange(f.row, 1, 1, 2).setHorizontalAlignment('left');
     } else if (f.type === 'total') {
       r.setBackground('#dfe7ee').setFontWeight('bold');
+      r.setNumberFormats([numberFormatRow(f.cols, f.nCats)]);
     } else if (f.type === 'data') {
-      sh.getRange(f.row, 3).setNumberFormat('0.00%');
+      // ตั้งรูปแบบเองทุกช่อง ไม่งั้นรูปแบบเก่าจะค้าง เช่นตอนที่คอลัมน์วันที่
+      // เคยอยู่ตรงตำแหน่งนี้ ทำให้เลข 28 กลายเป็นวันที่ 1900-01-27
+      r.setNumberFormats([numberFormatRow(f.cols, f.nCats)]);
+
       // ระบายสีตามจำนวนที่พบ เข้ม = เยอะ
       var colors = f.vals.map(function (v) { return heatColor(v, maxVal); });
       if (colors.length) {
@@ -439,6 +445,17 @@ function buildSummarySheet() {
   } catch (e) { /* ไม่เป็นไร */ }
 
   Logger.log('buildSummarySheet: เสร็จเรียบร้อย');
+}
+
+/**
+ * รูปแบบตัวเลขของ 1 แถวข้อมูล
+ * คอลัมน์: ห้อง | Room type | % | รวม | หมวด×n | วันที่ | รอบ | ผู้ตรวจ
+ */
+function numberFormatRow(cols, nCats) {
+  var f = ['@', '@', '0.00%', '0'];              // ห้อง / type / % / รวม
+  for (var i = 0; i < nCats; i++) f.push('0');   // ทุกหมวดเป็นจำนวนเต็ม
+  while (f.length < cols) f.push('@');           // วันที่ / รอบ / ผู้ตรวจ เป็นข้อความ
+  return f.slice(0, cols);
 }
 
 /** ไล่เฉดสีเดียว อ่อน → เข้ม (ตัวเลขยังอยู่ในช่อง สีเป็นแค่ตัวช่วยอ่าน) */
