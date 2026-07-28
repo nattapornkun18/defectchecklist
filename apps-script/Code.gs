@@ -347,7 +347,7 @@ function buildSummarySheet() {
     Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'd MMM yyyy HH:mm')]);
   rows.push([]);
 
-  var maxCols = 0, maxVal = 0;
+  var maxCols = 0, maxVal = 0, maxCats = 0;
   order.forEach(function (rt) {
     groups[rt].forEach(function (i) {
       catsOf(rt).forEach(function (c) { maxVal = Math.max(maxVal, catQty(i, c.name)); });
@@ -357,8 +357,9 @@ function buildSummarySheet() {
   order.forEach(function (rt) {
     var cats = catsOf(rt);
     var g = groups[rt];
+    maxCats = Math.max(maxCats, cats.length);
 
-    var header = ['หมายเลขห้อง', 'Room type', '%', 'รวม']
+    var header = ['หมายเลขห้อง', '%', 'รวม']
       .concat(cats.map(function (c) { return c.th; }))
       .concat(['วันที่', 'รอบ', 'ผู้ตรวจ']);
     maxCols = Math.max(maxCols, header.length);
@@ -379,14 +380,14 @@ function buildSummarySheet() {
       var pts = i.total || 0;
 
       // นำหน้าด้วย ' เพื่อให้เป็นข้อความ ไม่งั้นห้อง "03" จะกลายเป็น 3
-      rows.push(["'" + i.room, rt, pts ? tot / pts : 0, tot]
+      rows.push(["'" + i.room, pts ? tot / pts : 0, tot]
         .concat(vals)
         .concat([i.date, i.round, i.inspector]));
-      fmt.push({ type: 'data', row: rows.length, first: 5, vals: vals,
+      fmt.push({ type: 'data', row: rows.length, first: 4, vals: vals,
                  cols: header.length, nCats: cats.length });
     });
 
-    rows.push(['รวมทั้งกลุ่ม', '', '', grand].concat(colTotals).concat(['', '', '']));
+    rows.push(['รวมทั้งกลุ่ม', '', grand].concat(colTotals).concat(['', '', '']));
     fmt.push({ type: 'total', row: rows.length, cols: header.length, nCats: cats.length });
     rows.push([]);
   });
@@ -432,8 +433,8 @@ function buildSummarySheet() {
       r.setBackground('#14607a').setFontColor('#ffffff').setFontWeight('bold');
     } else if (f.type === 'header') {
       r.setBackground('#eef1f6').setFontWeight('bold').setFontSize(9)
-        .setHorizontalAlignment('center').setWrap(true);
-      sh.getRange(f.row, 1, 1, 2).setHorizontalAlignment('left');
+        .setHorizontalAlignment('center').setWrap(false);
+      sh.getRange(f.row, 1, 1, 1).setHorizontalAlignment('left');
     } else if (f.type === 'total') {
       r.setBackground('#dfe7ee').setFontWeight('bold');
     } else if (f.type === 'data') {
@@ -461,8 +462,11 @@ function buildSummarySheet() {
   }
 
   try { sh.setFrozenColumns(1); } catch (e) { /* มี merge ค้างอยู่ ไม่ใช่เรื่องคอขาดบาดตาย */ }
-  sh.autoResizeColumns(1, Math.min(width, 20));
-  sh.getRange(1, 1, grid.length, width).setVerticalAlignment('middle');
+  setColumnLayout(sh, width, maxCats);
+  sh.getRange(1, 1, grid.length, width)
+    .setVerticalAlignment('middle')
+    .setFontSize(10);
+  sh.getRange(1, 1, 2, width).setFontSize(9);      // สองบรรทัดบนเป็นหัวเรื่อง
   } catch (fmtErr) {
     try {
       PropertiesService.getScriptProperties().setProperty('lastSummaryError',
@@ -485,10 +489,26 @@ function buildSummarySheet() {
  * คอลัมน์: ห้อง | Room type | % | รวม | หมวด×n | วันที่ | รอบ | ผู้ตรวจ
  */
 function numberFormatRow(cols, nCats) {
-  var f = ['@', '@', '0.00%', '0'];              // ห้อง / type / % / รวม
+  var f = ['@', '0.00%', '0'];                   // ห้อง / % / รวม
   for (var i = 0; i < nCats; i++) f.push('0');   // ทุกหมวดเป็นจำนวนเต็ม
   while (f.length < cols) f.push('@');           // วันที่ / รอบ / ผู้ตรวจ เป็นข้อความ
   return f.slice(0, cols);
+}
+
+/**
+ * ตั้งความกว้างคอลัมน์แบบตายตัว
+ * ห้ามใช้ autoResizeColumns เพราะมันวัดใหม่ตามเนื้อหาทุกครั้งที่สร้างชีท
+ * ทำให้หน้าตาตารางขยับไปมาไม่เหมือนเดิมสักครั้ง
+ */
+function setColumnLayout(sh, width, maxCats) {
+  var W_ROOM = 88, W_PCT = 72, W_TOTAL = 66, W_CAT = 92, W_TAIL = 104;
+  try {
+    sh.setColumnWidth(1, W_ROOM);
+    sh.setColumnWidth(2, W_PCT);
+    sh.setColumnWidth(3, W_TOTAL);
+    if (maxCats > 0) sh.setColumnWidths(4, maxCats, W_CAT);
+    for (var c = 4 + maxCats; c <= width; c++) sh.setColumnWidth(c, W_TAIL);
+  } catch (e) { /* ความกว้างเพี้ยนไม่ใช่เรื่องคอขาดบาดตาย */ }
 }
 
 /** ไล่เฉดสีเดียว อ่อน → เข้ม (ตัวเลขยังอยู่ในช่อง สีเป็นแค่ตัวช่วยอ่าน) */
