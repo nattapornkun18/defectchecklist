@@ -170,7 +170,7 @@ const CATEGORIES = [
     ],
   },
   {
-    id: 'luggage', name: 'Luggage', th: 'ม้านั่ง / วางกระเป๋า',
+    id: 'luggage', name: 'Luggage', th: 'ที่วางกระเป๋า',
     img: 'img/cat03.jpg', imgW: 1240, imgH: 1753,
     pins: [],
     items: [
@@ -214,7 +214,7 @@ const CATEGORIES = [
   },
   {
     id: 'bed', name: 'Bed', th: 'เตียง',
-    img: 'img/cat04.jpg', imgW: 1450, imgH: 1800,
+    img: 'img/cat04.jpg', imgW: 1240, imgH: 1516,
     notes: [
       'เส้นปะคือเส้นแบ่งขอบเขต',
       'switch ทุกอันหากกดยาก = defect',
@@ -293,7 +293,7 @@ const CATEGORIES = [
   },
   {
     id: 'mirror', name: 'Mirror', th: 'กระจก / หน้าต่าง',
-    img: 'img/cat05.jpg', imgW: 1800, imgH: 1273,
+    img: 'img/cat05.jpg', imgW: 1240, imgH: 849,
     pins: [],
     items: [
       { no: 1, th: 'เส้นขอบผนัง vertical - 01' },
@@ -347,7 +347,7 @@ const CATEGORIES = [
   },
   {
     id: 'minibar', name: 'Minibar', th: 'มินิบาร์ / ทีวี',
-    img: 'img/cat06.jpg', imgW: 1525, imgH: 1776,
+    img: 'img/cat06.jpg', imgW: 1240, imgH: 1432,
     pins: [],
     items: [
       { no: 1, th: 'เส้นขอบผนัง horzontal - 01' },
@@ -568,7 +568,7 @@ const CATEGORIES = [
   },
   {
     id: 'ceiling', name: 'Ceiling', th: 'ฝ้าเพดาน',
-    img: 'img/cat09.jpg', imgW: 1536, imgH: 1443,
+    img: 'img/cat09.jpg', imgW: 1240, imgH: 1144,
     pins: [],
     items: [
       { no: 1, th: 'ผิวฝ้ายิปซัม' },
