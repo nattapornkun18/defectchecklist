@@ -16,6 +16,7 @@
 
 var SHEET_SUMMARY = 'Inspections';
 var SHEET_DETAIL = 'DefectLog';
+var SHEET_PIVOT = 'สรุปรวม';           // ตารางสรุปที่สร้างใหม่ทุกครั้งที่บันทึก
 var PHOTO_FOLDER = 'Defect Checklist Photos';
 
 var HEAD_SUMMARY = [
@@ -48,6 +49,7 @@ function doPost(e) {
     if (action === 'submit') return json(handleSubmit(body));
     if (action === 'load') return json(handleLoad(body));
     if (action === 'summary') return json(handleSummary(body));
+    if (action === 'rebuildSheet') { buildSummarySheet(); return json({ ok: true }); }
 
     return json({ ok: false, error: 'ไม่รู้จัก action: ' + action });
   } catch (err) {
@@ -120,6 +122,17 @@ function handleSubmit(p) {
     }
 
     styleHeaders(sumSheet, detSheet);
+
+    // จำรายชื่อหมวดของ room type นี้ไว้ เพื่อให้ตารางสรุปมีคอลัมน์ครบ
+    // แม้บางหมวดจะยังไม่เคยเจอ defect เลย
+    if (p.roomType && p.catalog && p.catalog.length) {
+      try {
+        PropertiesService.getScriptProperties()
+          .setProperty('cats:' + p.roomType, JSON.stringify(p.catalog));
+      } catch (e) { /* ไม่ใช่เรื่องคอขาดบาดตาย */ }
+    }
+
+    try { buildSummarySheet(); } catch (e) { /* สรุปพังไม่ควรทำให้บันทึกล้มเหลว */ }
 
     return { ok: true, rowsWritten: out.length, inspectionId: p.inspectionId };
   } finally {
@@ -221,6 +234,185 @@ function handleSummary(p) {
   }
 
   return { ok: true, inspections: order.map(function (id) { return byId[id]; }) };
+}
+
+/* ═════════════════════ ตารางสรุปในชีท ═════════════════════ */
+
+/**
+ * สร้างชีท "สรุปรวม" ใหม่ทั้งแผ่น — แยกกลุ่มตาม room type
+ * แถว = ห้อง · คอลัมน์ = หมวด · มีคอลัมน์รวม % และแถวรวมทั้งกลุ่ม
+ *
+ * เรียกอัตโนมัติทุกครั้งที่บันทึก และเรียกเองได้จากเมนู "Defect Checklist"
+ */
+function buildSummarySheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var data = handleSummary({});
+  var list = latestPerRoom(data.inspections || []);
+
+  var sh = ss.getSheetByName(SHEET_PIVOT) || ss.insertSheet(SHEET_PIVOT);
+  sh.clear();
+  sh.clearConditionalFormatRules();
+
+  if (!list.length) {
+    sh.getRange(1, 1).setValue('ยังไม่มีผลตรวจ').setFontWeight('bold');
+    return;
+  }
+
+  // จัดกลุ่มตาม room type
+  var groups = {}, order = [];
+  list.forEach(function (i) {
+    var k = i.roomType || '(ไม่ระบุ room type)';
+    if (!groups[k]) { groups[k] = []; order.push(k); }
+    groups[k].push(i);
+  });
+
+  var rows = [], fmt = [];       // fmt เก็บพิกัดไว้ระบายสีทีหลัง
+  rows.push(['บันทึกจำนวน Defect รวม แยกตามห้อง / โซน']);
+  rows.push(['อัปเดตอัตโนมัติทุกครั้งที่มีการบันทึกจากหน้าเว็บ · ล่าสุด ' +
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'd MMM yyyy HH:mm')]);
+  rows.push([]);
+
+  var maxCols = 0, maxVal = 0;
+  order.forEach(function (rt) {
+    groups[rt].forEach(function (i) {
+      catsOf(rt).forEach(function (c) { maxVal = Math.max(maxVal, catQty(i, c.name)); });
+    });
+  });
+
+  order.forEach(function (rt) {
+    var cats = catsOf(rt);
+    var g = groups[rt];
+
+    var header = ['หมายเลขห้อง', 'Room type', '%', 'รวม']
+      .concat(cats.map(function (c) { return c.th; }))
+      .concat(['วันที่', 'รอบ', 'ผู้ตรวจ']);
+    maxCols = Math.max(maxCols, header.length);
+
+    rows.push([rt]);
+    fmt.push({ type: 'group', row: rows.length, cols: header.length });
+    rows.push(header);
+    fmt.push({ type: 'header', row: rows.length, cols: header.length });
+
+    var colTotals = cats.map(function () { return 0; });
+    var grand = 0;
+
+    g.forEach(function (i) {
+      var vals = cats.map(function (c) { return catQty(i, c.name); });
+      var tot = vals.reduce(function (a, b) { return a + b; }, 0);
+      grand += tot;
+      vals.forEach(function (v, ix) { colTotals[ix] += v; });
+      var pts = i.total || 0;
+
+      rows.push([i.room, rt, pts ? tot / pts : 0, tot]
+        .concat(vals)
+        .concat([i.date, i.round, i.inspector]));
+      fmt.push({ type: 'data', row: rows.length, first: 5, vals: vals, cols: header.length });
+    });
+
+    rows.push(['รวมทั้งกลุ่ม', '', '', grand].concat(colTotals).concat(['', '', '']));
+    fmt.push({ type: 'total', row: rows.length, cols: header.length });
+    rows.push([]);
+  });
+
+  // เขียนทีเดียวจบ เร็วกว่าเขียนทีละแถวมาก
+  var width = Math.max(maxCols, 1);
+  var grid = rows.map(function (r) {
+    var line = r.slice();
+    while (line.length < width) line.push('');
+    return line;
+  });
+  sh.getRange(1, 1, grid.length, width).setValues(grid);
+
+  // ── จัดรูปแบบ ──
+  sh.getRange(1, 1).setFontSize(13).setFontWeight('bold');
+  sh.getRange(2, 1).setFontSize(9).setFontColor('#5e6a7e');
+
+  fmt.forEach(function (f) {
+    var r = sh.getRange(f.row, 1, 1, f.cols);
+    if (f.type === 'group') {
+      r.merge().setBackground('#14607a').setFontColor('#ffffff').setFontWeight('bold');
+    } else if (f.type === 'header') {
+      r.setBackground('#eef1f6').setFontWeight('bold').setFontSize(9)
+        .setHorizontalAlignment('center').setWrap(true);
+      sh.getRange(f.row, 1, 1, 2).setHorizontalAlignment('left');
+    } else if (f.type === 'total') {
+      r.setBackground('#dfe7ee').setFontWeight('bold');
+    } else if (f.type === 'data') {
+      sh.getRange(f.row, 3).setNumberFormat('0.00%');
+      // ระบายสีตามจำนวนที่พบ เข้ม = เยอะ
+      var colors = f.vals.map(function (v) { return heatColor(v, maxVal); });
+      sh.getRange(f.row, f.first, 1, colors.length).setBackgrounds([colors]);
+    }
+  });
+
+  sh.setFrozenColumns(1);
+  sh.autoResizeColumns(1, Math.min(width, 20));
+  sh.getRange(1, 1, grid.length, width).setVerticalAlignment('middle');
+
+  // ย้ายไปเป็นแท็บแรก จะได้เห็นก่อนเพื่อน
+  ss.setActiveSheet(sh);
+  ss.moveActiveSheet(1);
+}
+
+/** ไล่เฉดสีเดียว อ่อน → เข้ม (ตัวเลขยังอยู่ในช่อง สีเป็นแค่ตัวช่วยอ่าน) */
+function heatColor(v, max) {
+  if (!v) return '#ffffff';
+  var steps = ['#fdeceb', '#fad3d1', '#f4aeaa', '#e8817c', '#d4534d', '#ad2f2a'];
+  if (max <= 1) return steps[2];
+  var f = v / max;
+  var i = f <= 0.10 ? 0 : f <= 0.25 ? 1 : f <= 0.45 ? 2 : f <= 0.65 ? 3 : f <= 0.85 ? 4 : 5;
+  return steps[i];
+}
+
+/** ห้องเดียวกันที่ตรวจหลายรอบ → เอาครั้งที่บันทึกล่าสุด */
+function latestPerRoom(list) {
+  var by = {};
+  list.forEach(function (i) {
+    var cur = by[i.room];
+    if (!cur || String(i.savedAt) > String(cur.savedAt)) by[i.room] = i;
+  });
+  return Object.keys(by).sort(function (a, b) { return Number(a) - Number(b); })
+    .map(function (k) { return by[k]; });
+}
+
+/** รายชื่อหมวดของ room type — เอาจากที่หน้าเว็บส่งมา ถ้าไม่มีก็อนุมานจาก DefectLog */
+function catsOf(roomType) {
+  try {
+    var raw = PropertiesService.getScriptProperties().getProperty('cats:' + roomType);
+    if (raw) {
+      var arr = JSON.parse(raw);
+      if (arr && arr.length) {
+        return arr.sort(function (a, b) { return a.no - b.no; });
+      }
+    }
+  } catch (e) { /* ตกไปใช้วิธีสำรอง */ }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var det = ss.getSheetByName(SHEET_DETAIL);
+  if (!det || det.getLastRow() < 2) return [];
+  var d = det.getRange(2, 7, det.getLastRow() - 1, 3).getValues();   // หมวดที่ / หมวด / หมวด(TH)
+  var seen = {}, out = [];
+  d.forEach(function (r) {
+    var name = String(r[1]);
+    if (!name || seen[name]) return;
+    seen[name] = 1;
+    out.push({ no: num(r[0]), name: name, th: String(r[2] || name) });
+  });
+  return out.sort(function (a, b) { return a.no - b.no; });
+}
+
+function catQty(insp, catName) {
+  var c = insp.cats && insp.cats[catName];
+  return c ? (c.qty || 0) : 0;
+}
+
+/** เมนูในชีท เผื่ออยากสั่งอัปเดตเอง */
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('Defect Checklist')
+    .addItem('อัปเดตชีทสรุปรวม', 'buildSummarySheet')
+    .addItem('สร้างชีทที่จำเป็น', 'setupSheets')
+    .addToUi();
 }
 
 /* ───────────────────────── helpers ───────────────────────── */

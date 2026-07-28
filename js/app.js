@@ -607,6 +607,10 @@
         progressPct: Math.round(pct(t.done, t.total)),
       },
       rows: rows,
+      // ส่งรายชื่อหมวดไปด้วย ชีทสรุปจะได้มีคอลัมน์ครบแม้บางหมวดไม่มี defect เลย
+      catalog: CATEGORIES.map(function (c) {
+        return { no: c.no, name: c.name, th: c.th };
+      }),
       clientTime: new Date().toISOString(),
     };
   }
