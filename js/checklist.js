@@ -33,7 +33,7 @@ const RESULTS = [
 const CATEGORIES = [
   {
     id: 'door', name: 'Door', th: 'ประตูทางเข้า',
-    img: 'img/cat01.jpg', imgW: 1368, imgH: 1800,
+    img: 'img/cat01.jpg', imgW: 1240, imgH: 1687,
     pins: [],
     items: [
       { no: 1, th: 'เส้นขอบไม้ vertical - 01' },
@@ -112,7 +112,7 @@ const CATEGORIES = [
   },
   {
     id: 'sink', name: 'Sink', th: 'อ่างล้างหน้า',
-    img: 'img/cat02.jpg', imgW: 1273, imgH: 1800,
+    img: 'img/cat02.jpg', imgW: 1240, imgH: 1753,
     notes: [
       'ประเภทหมุด — วงกลมแดง: เส้นขอบ vertical · วงกลมเหลือง: เส้นขอบ horizontal · วงกลมเส้นประ: สิ่งของ / ผิวผนัง / พื้น',
     ],
@@ -170,8 +170,8 @@ const CATEGORIES = [
     ],
   },
   {
-    id: 'luggage', name: 'Language', th: 'ม้านั่ง / วางกระเป๋า',
-    img: 'img/cat03.jpg', imgW: 1273, imgH: 1800,
+    id: 'luggage', name: 'Luggage', th: 'ม้านั่ง / วางกระเป๋า',
+    img: 'img/cat03.jpg', imgW: 1240, imgH: 1753,
     pins: [],
     items: [
       { no: 1, th: 'เส้นขอบผนัง Horizontal - 01' },
@@ -408,7 +408,7 @@ const CATEGORIES = [
   },
   {
     id: 'shower', name: 'Shower', th: 'ห้องอาบน้ำ',
-    img: 'img/cat07.jpg', imgW: 1660, imgH: 1046,
+    img: 'img/cat07.jpg', imgW: 1240, imgH: 787,
     pins: [],
     items: [
       { no: 1, th: 'เส้นขอบผนัง vertical - 01' },
@@ -493,7 +493,7 @@ const CATEGORIES = [
   },
   {
     id: 'toilet', name: 'Toilet', th: 'ห้องน้ำ / สุขภัณฑ์',
-    img: 'img/cat08.jpg', imgW: 1800, imgH: 1109,
+    img: 'img/cat08.jpg', imgW: 1240, imgH: 762,
     pins: [],
     items: [
       { no: 1, th: 'เส้นขอบผนัง vertical - 01' },
