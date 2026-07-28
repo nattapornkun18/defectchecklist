@@ -258,11 +258,22 @@ function handleSummary(p) {
  * เรียกอัตโนมัติทุกครั้งที่บันทึก และเรียกเองได้จากเมนู "Defect Checklist"
  */
 function buildSummarySheet() {
+  Logger.log('buildSummarySheet: เริ่ม');
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) throw new Error('getActiveSpreadsheet() คืนค่า null — สคริปต์อาจไม่ได้ผูกกับชีทนี้');
+  Logger.log('ไฟล์: ' + ss.getName());
+
   var data = handleSummary({});
   var list = latestPerRoom(data.inspections || []);
+  Logger.log('อ่านผลตรวจได้ ' + (data.inspections || []).length + ' ครั้ง → ใช้จริง ' + list.length + ' ห้อง');
 
-  var sh = ss.getSheetByName(SHEET_PIVOT) || ss.insertSheet(SHEET_PIVOT);
+  var sh = ss.getSheetByName(SHEET_PIVOT);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET_PIVOT);
+    Logger.log('สร้างแท็บ "' + SHEET_PIVOT + '" ใหม่');
+  } else {
+    Logger.log('เจอแท็บ "' + SHEET_PIVOT + '" เดิมอยู่แล้ว');
+  }
   sh.clear();
   sh.clearConditionalFormatRules();
   // clear() ไม่ได้ยกเลิก merge ที่ทำไว้รอบก่อน ถ้าไม่ยกเลิกก่อน
@@ -340,6 +351,7 @@ function buildSummarySheet() {
     return line;
   });
   sh.getRange(1, 1, grid.length, width).setValues(grid);
+  Logger.log('เขียนข้อมูลลงแท็บแล้ว ' + grid.length + ' แถว × ' + width + ' คอลัมน์');
 
   // ── จัดรูปแบบ ── (ห่อไว้ เพราะถึงตกแต่งพัง ตัวเลขก็ต้องอยู่ในชีทแล้ว)
   try {
@@ -382,6 +394,8 @@ function buildSummarySheet() {
     ss.setActiveSheet(sh);
     ss.moveActiveSheet(1);
   } catch (e) { /* ไม่เป็นไร */ }
+
+  Logger.log('buildSummarySheet: เสร็จเรียบร้อย');
 }
 
 /** ไล่เฉดสีเดียว อ่อน → เข้ม (ตัวเลขยังอยู่ในช่อง สีเป็นแค่ตัวช่วยอ่าน) */
@@ -443,6 +457,7 @@ function onOpen() {
     .addItem('อัปเดตชีทสรุปรวม', 'buildSummarySheet')
     .addItem('ลบผลตรวจ 1 ครั้ง (ตาม InspectionID)', 'deleteInspectionByPrompt')
     .addItem('ดูข้อผิดพลาดล่าสุดของชีทสรุป', 'showLastSummaryError')
+    .addItem('🔍 ตรวจสอบระบบ (diagnose)', 'diagnose')
     .addItem('สร้างชีทที่จำเป็น', 'setupSheets')
     .addToUi();
 }
@@ -488,6 +503,54 @@ function deleteInspectionByPrompt() {
     lock.releaseLock();
   }
   ui.alert('ลบเรียบร้อย และอัปเดตชีทสรุปรวมให้แล้ว');
+}
+
+/**
+ * ตรวจสอบระบบทั้งหมด — เลือกฟังก์ชันนี้แล้วกด Run
+ * แล้วดูผลที่ Execution log (ปุ่มบนแถบเครื่องมือ)
+ */
+function diagnose() {
+  var out = [];
+  function add(k, v) { out.push(k + ': ' + v); Logger.log(k + ': ' + v); }
+
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    add('ชีทที่ผูกอยู่', ss ? ss.getName() : '❌ null (สคริปต์ไม่ได้ผูกกับชีท)');
+    if (!ss) return out.join('\n');
+
+    add('แท็บทั้งหมด', ss.getSheets().map(function (x) { return x.getName(); }).join(' | '));
+
+    var sum = ss.getSheetByName(SHEET_SUMMARY);
+    var det = ss.getSheetByName(SHEET_DETAIL);
+    add('Inspections', sum ? sum.getLastRow() - 1 + ' แถวข้อมูล' : '❌ ไม่มีแท็บนี้');
+    add('DefectLog', det ? det.getLastRow() - 1 + ' แถวข้อมูล' : '❌ ไม่มีแท็บนี้');
+
+    var data = handleSummary({});
+    add('handleSummary อ่านได้', (data.inspections || []).length + ' ครั้งการตรวจ');
+
+    var rts = {};
+    (data.inspections || []).forEach(function (i) { rts[i.roomType] = 1; });
+    add('room type ที่เจอ', Object.keys(rts).join(' | ') || '(ไม่มี)');
+
+    Object.keys(rts).forEach(function (rt) {
+      add('หมวดของ "' + rt + '"', catsOf(rt).length + ' หมวด → ' +
+        catsOf(rt).map(function (c) { return c.th; }).join(', '));
+    });
+
+    add('เวอร์ชันโค้ด', 'มี buildSummarySheet = ' + (typeof buildSummarySheet === 'function'));
+
+    buildSummarySheet();
+    var pv = ss.getSheetByName(SHEET_PIVOT);
+    add('ผลลัพธ์', pv ? '✅ แท็บ "' + SHEET_PIVOT + '" มีแล้ว ' + pv.getLastRow() + ' แถว'
+                     : '❌ ยังไม่มีแท็บ "' + SHEET_PIVOT + '"');
+  } catch (err) {
+    add('❌ ERROR', String((err && err.stack) || (err && err.message) || err));
+  }
+
+  var text = out.join('\n');
+  try { SpreadsheetApp.getUi().alert('ผลตรวจสอบระบบ', text, SpreadsheetApp.getUi().ButtonSet.OK); }
+  catch (e) { /* รันจาก editor ไม่มี UI — ดูที่ Execution log แทน */ }
+  return text;
 }
 
 /** ดูว่าชีทสรุปพังเพราะอะไรครั้งล่าสุด */
