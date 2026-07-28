@@ -423,7 +423,10 @@ function buildSummarySheet() {
     try {
     var r = sh.getRange(f.row, 1, 1, f.cols);
     if (f.type === 'group') {
-      r.merge().setBackground('#14607a').setFontColor('#ffffff').setFontWeight('bold');
+      // ไม่ merge เพราะเซลล์ที่ merge ยาวทั้งแถวทำให้ setFrozenColumns(1) ใช้ไม่ได้
+      // ("can't freeze columns which contain only part of a merged cell")
+      // ระบายสีทั้งแถวแทน ได้หน้าตาเหมือนกันทุกประการ
+      r.setBackground('#14607a').setFontColor('#ffffff').setFontWeight('bold');
     } else if (f.type === 'header') {
       r.setBackground('#eef1f6').setFontWeight('bold').setFontSize(9)
         .setHorizontalAlignment('center').setWrap(true);
@@ -454,7 +457,7 @@ function buildSummarySheet() {
     } catch (e) { /* ไม่เป็นไร */ }
   }
 
-  sh.setFrozenColumns(1);
+  try { sh.setFrozenColumns(1); } catch (e) { /* มี merge ค้างอยู่ ไม่ใช่เรื่องคอขาดบาดตาย */ }
   sh.autoResizeColumns(1, Math.min(width, 20));
   sh.getRange(1, 1, grid.length, width).setVerticalAlignment('middle');
   } catch (fmtErr) {
