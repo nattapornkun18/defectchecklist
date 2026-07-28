@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14607a">
+<title>ตั้งพิกัดหมุด — Defect Checklist</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314607a'/%3E%3Ccircle cx='16' cy='13' r='5' fill='%23fff'/%3E%3Cpath d='M16 18l0 8' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/app.css">
+<style>
+  .tag-stage { position: relative; margin: 13px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); background: #eceff4; line-height: 0; }
+  .tag-stage img { width: 100%; height: auto; display: block; cursor: crosshair; }
+  .tag-pin {
+    position: absolute; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%;
+    border: 2px solid #fff; background: var(--pass); color: #fff; font-size: .66rem; font-weight: 700;
+    display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,.45); pointer-events: none;
+  }
+  .tag-pin.cur { background: var(--return); animation: pinflash .9s ease infinite; }
+  .cur-item { background: var(--brand); color: #fff; border-radius: 12px; margin: 13px; padding: 12px 14px; }
+  .cur-item .n { font-size: 1.6rem; font-weight: 800; line-height: 1; }
+  .cur-item .t { font-size: .92rem; margin-top: 4px; }
+  .cur-item .c { font-size: .76rem; opacity: .85; margin-top: 2px; }
+  .btn-row { display: flex; gap: 8px; margin: 13px; flex-wrap: wrap; }
+  .btn-row .btn { flex: 1; min-width: 120px; }
+  textarea.out { width: calc(100% - 26px); margin: 0 13px; min-height: 160px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .74rem; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+</style>
+</head>
+<body>
+
+<div class="screen active">
+  <header class="topbar">
+    <div class="topbar-row">
+      <div style="min-width:0;flex:1">
+        <h1>ตั้งพิกัดหมุดบนรูป</h1>
+        <div class="sub" id="sub">—</div>
+      </div>
+      <a class="icon-btn" href="index.html" title="กลับไปหน้าฟอร์ม" style="text-decoration:none">✕</a>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-bar"><span class="p-pass" id="bar"></span></div>
+      <div class="progress-legend" id="legend"></div>
+    </div>
+  </header>
+
+  <div class="banner info no-print">
+    <span>💡</span>
+    <span>เลือกหมวด แล้ว<b>แตะบนรูปตรงตำแหน่งหมายเลขที่ระบบถาม</b> ทีละจุดจนครบ
+    ระบบบันทึกความคืบหน้าให้อัตโนมัติ ทำค้างไว้แล้วกลับมาทำต่อได้
+    เสร็จแล้วกด "คัดลอกโค้ด" ไปวางใน <code>js/checklist.js</code></span>
+  </div>
+
+  <div class="card">
+    <div class="field">
+      <label for="fCat">หมวด</label>
+      <select id="fCat"></select>
+    </div>
+  </div>
+
+  <div class="cur-item" id="curItem">
+    <div class="n" id="curNo">—</div>
+    <div class="t" id="curText">—</div>
+    <div class="c" id="curCount">—</div>
+  </div>
+
+  <div class="tag-stage" id="stage">
+    <img id="img" alt="รูปอ้างอิง">
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-ghost" id="btnUndo">↩ ย้อนกลับ 1 จุด</button>
+    <button class="btn btn-ghost" id="btnSkip">ข้ามจุดนี้ →</button>
+    <button class="btn btn-ghost" id="btnClear">ล้างหมวดนี้</button>
+    <button class="btn btn-primary" id="btnCopy">📋 คัดลอกโค้ด</button>
+  </div>
+
+  <textarea class="out" id="out" readonly spellcheck="false"></textarea>
+  <div style="height:30px"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/checklist.js"></script>
+<script src="js/tag.js"></script>
+</body>
+</html>

@@ -1,17 +1,17 @@
 /**
- * Code.gs — Backend สำหรับ Defect Checklist
+ * Code.gs — Backend สำหรับ Defect Checklist (10 - Deluxe King - Right)
  *
  * วิธีติดตั้ง (ย่อ — ดูละเอียดใน README.md):
  *   1. เปิด Google Sheet ที่ต้องการเก็บข้อมูล → Extensions → Apps Script
  *   2. วางไฟล์นี้ทับ Code.gs เดิมทั้งหมด
  *   3. Deploy → New deployment → Web app
- *        Execute as:  Me
+ *        Execute as:      Me
  *        Who has access:  Anyone
  *   4. คัดลอก Web app URL ไปใส่ในหน้าเว็บ (ปุ่ม ⚙ ตั้งค่า)
  *
  * ชีทที่ใช้ (สร้างอัตโนมัติถ้ายังไม่มี):
  *   Inspections — สรุป 1 แถวต่อการตรวจ 1 ครั้ง
- *   DefectLog   — 1 แถวต่อ 1 รายการที่เป็น Defect หรือ N/A
+ *   DefectLog   — 1 แถวต่อ 1 จุดที่ติด "ส่งคืน" หรือ "แก้เอง"
  */
 
 var SHEET_SUMMARY = 'Inspections';
@@ -20,14 +20,16 @@ var PHOTO_FOLDER = 'Defect Checklist Photos';
 
 var HEAD_SUMMARY = [
   'Timestamp', 'InspectionID', 'Room', 'RoomType', 'Round', 'Inspector', 'Date',
-  'TotalItems', 'Checked', 'Pass', 'Defect', 'N/A', 'DefectQty', 'Progress %', 'Note'
+  'จุดตรวจทั้งหมด', 'ตรวจแล้ว', 'ผ่าน', 'ส่งคืน', 'แก้เอง', 'จำนวนจุดที่พบ', 'Progress %', 'หมายเหตุ'
 ];
 
 var HEAD_DETAIL = [
   'Timestamp', 'InspectionID', 'Room', 'Round', 'Inspector', 'Date',
-  'ZoneNo', 'Zone', 'ItemNo', 'Item (TH)', 'Item (EN)',
-  'Status', 'Qty', 'Detail', 'Photos'
+  'หมวดที่', 'หมวด', 'หมวด (TH)', 'ข้อที่', 'จุดตรวจสอบ',
+  'ผล', 'จำนวน', 'รายละเอียด', 'รูปถ่าย'
 ];
+
+var STATUS_COL = 12;   // คอลัมน์ L = ผล
 
 /* ───────────────────────── entry points ───────────────────────── */
 
@@ -47,7 +49,7 @@ function doPost(e) {
 
     return json({ ok: false, error: 'ไม่รู้จัก action: ' + action });
   } catch (err) {
-    return json({ ok: false, error: String(err && err.message || err) });
+    return json({ ok: false, error: String((err && err.message) || err) });
   }
 }
 
@@ -69,7 +71,7 @@ function handleSubmit(p) {
   if (!p.inspectionId) return { ok: false, error: 'ไม่มี inspectionId' };
   if (!p.room) return { ok: false, error: 'ไม่ได้ระบุห้อง' };
 
-  // ล็อกกันการเขียนชนกันเมื่อมีผู้ตรวจหลายคนกดบันทึกพร้อมกัน
+  // ล็อกกันเขียนชนกันเมื่อผู้ตรวจหลายคนกดบันทึกพร้อมกัน
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
 
@@ -78,7 +80,7 @@ function handleSubmit(p) {
     var sumSheet = ensureSheet(ss, SHEET_SUMMARY, HEAD_SUMMARY);
     var detSheet = ensureSheet(ss, SHEET_DETAIL, HEAD_DETAIL);
 
-    // ส่งซ้ำของการตรวจครั้งเดิม = แทนที่ของเก่า ไม่ใช่เพิ่มซ้ำ
+    // ส่งซ้ำของการตรวจครั้งเดิม = แทนที่ ไม่ใช่เพิ่มซ้ำ
     deleteRowsById(sumSheet, 2, p.inspectionId);
     deleteRowsById(detSheet, 2, p.inspectionId);
 
@@ -88,7 +90,7 @@ function handleSubmit(p) {
     sumSheet.appendRow([
       now, p.inspectionId, p.room, p.roomType || '', p.round || '',
       p.inspector || '', p.date || '',
-      num(s.total), num(s.checked), num(s.pass), num(s.defect), num(s.na),
+      num(s.total), num(s.checked), num(s.pass), num(s.ret), num(s.fix),
       num(s.defectQty), num(s.progressPct), p.note || ''
     ]);
 
@@ -99,13 +101,13 @@ function handleSubmit(p) {
       if (r.photos && r.photos.length) {
         if (!folder) folder = ensureFolder(PHOTO_FOLDER);
         urls = r.photos.map(function (dataUrl, i) {
-          return savePhoto(folder, dataUrl, [p.inspectionId, r.itemKey, i + 1].join('_'));
+          return savePhoto(folder, dataUrl, [p.inspectionId, r.key, i + 1].join('_'));
         }).filter(String).join('\n');
       }
       return [
         now, p.inspectionId, p.room, p.round || '', p.inspector || '', p.date || '',
-        num(r.zoneNo), r.zone || '', num(r.itemNo), r.itemTh || '', r.itemEn || '',
-        statusLabel(r.status), num(r.qty), r.note || '', urls
+        num(r.catNo), r.cat || '', r.catTh || '', num(r.no), r.item || '',
+        resultLabel(r.result), num(r.qty), r.note || '', urls
       ];
     });
 
@@ -138,7 +140,7 @@ function ensureSheet(ss, name, headers) {
   return sh;
 }
 
-/** ลบทุกแถวที่คอลัมน์ idCol มีค่าตรงกับ id (ไล่จากล่างขึ้นบน) */
+/** ลบทุกแถวที่คอลัมน์ idCol ตรงกับ id (ไล่จากล่างขึ้นบน) */
 function deleteRowsById(sheet, idCol, id) {
   var last = sheet.getLastRow();
   if (last < 2) return;
@@ -167,11 +169,11 @@ function savePhoto(folder, dataUrl, baseName) {
   }
 }
 
-function statusLabel(s) {
-  if (s === 'defect') return 'Defect';
-  if (s === 'na') return 'N/A';
-  if (s === 'pass') return 'Pass';
-  return String(s || '');
+function resultLabel(r) {
+  if (r === 'return') return 'ส่งคืน';
+  if (r === 'fix') return 'แก้เอง';
+  if (r === 'pass') return 'ผ่าน';
+  return String(r || '');
 }
 
 function num(v) {
@@ -191,12 +193,11 @@ function styleHeaders(sumSheet, detSheet) {
   });
 }
 
-/** ระบายสีพื้นหลังตามสถานะ เฉพาะแถวที่เพิ่งเขียนใหม่ */
+/** ระบายสีพื้นหลังตามผล เฉพาะแถวที่เพิ่งเขียนใหม่ */
 function shadeStatusRows(sheet, firstRow, rows) {
-  var STATUS_COL = 12;   // คอลัมน์ L = Status
   var colors = rows.map(function (r) {
-    var c = r[STATUS_COL - 1] === 'Defect' ? '#fdeaea'
-          : r[STATUS_COL - 1] === 'N/A' ? '#eceff4' : '#ffffff';
+    var v = r[STATUS_COL - 1];
+    var c = v === 'ส่งคืน' ? '#fdeaea' : v === 'แก้เอง' ? '#fdf3e0' : '#ffffff';
     var line = [];
     for (var i = 0; i < HEAD_DETAIL.length; i++) line.push(c);
     return line;
