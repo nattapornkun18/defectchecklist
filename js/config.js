@@ -39,7 +39,7 @@ const ASSET_VERSION = '11';
  *
  * ตัวรหัสไม่ได้อยู่ในไฟล์นี้ (ไฟล์นี้เป็น public) แต่อยู่ที่ Apps Script
  */
-const REQUIRE_PIN = false;
+const REQUIRE_PIN = true;
 
 /** ความยาวรหัส (จำนวนวงกลมบนหน้าจอ) */
-const PIN_LENGTH = 4;
+const PIN_LENGTH = 3;
