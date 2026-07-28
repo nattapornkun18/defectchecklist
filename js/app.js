@@ -962,14 +962,20 @@
     $('btnLoad').addEventListener('click', loadFromSheet);
 
     $('btnReset').addEventListener('click', function () {
-      if (!confirm('ล้างผลตรวจของห้อง ' + state.room + ' ทั้งหมด?\nข้อมูลที่บันทึกลง Sheet ไปแล้วจะไม่ถูกลบ')) return;
+      // ปุ่มนี้แตะแค่ข้อมูลในเครื่อง ไม่มีการติดต่อ Sheet เลย
+      if (!confirm(
+        'ล้างผลตรวจของห้อง ' + state.room + ' "เฉพาะในเครื่องนี้"?\n\n' +
+        '• แถวที่บันทึกลง Sheet ไปแล้วยังอยู่ครบ — ปุ่มนี้ไม่ได้ต่อเน็ต\n' +
+        '• ถ้าล้างผิด ดึงกลับได้ด้วยปุ่ม ⭳ ดึงข้อมูลจาก Sheet\n\n' +
+        'แต่ถ้าตรวจใหม่แล้วกดบันทึกด้วย ห้อง + วันที่ + รอบ เดิม\n' +
+        'แถวเก่าใน Sheet จะถูกแทนที่ด้วยของใหม่')) return;
       var keep = { round: state.round, inspector: state.inspector, date: state.date };
       state = blankState(state.room);
       state.round = keep.round; state.inspector = keep.inspector; state.date = keep.date;
       saveDraft();
       switchRoom(state.room);
       if (openCat) { renderItems(); renderPins(); refreshCat(); }
-      toast('ล้างข้อมูลห้อง ' + state.room + ' แล้ว');
+      toast('ล้างข้อมูลห้อง ' + state.room + ' ในเครื่องแล้ว — Sheet ยังอยู่ครบ กด ⭳ ดึงกลับได้', 'ok', 5000);
     });
 
     $('btnPrint').addEventListener('click', function () { renderPrintArea(); window.print(); });
